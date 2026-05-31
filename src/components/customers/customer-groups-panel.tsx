@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { confirmDelete } from "@/lib/confirm";
+import { customerGroupSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
@@ -20,9 +22,13 @@ type Group = {
 export function CustomerGroupsPanel() {
   const router = useRouter();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [name, setName] = useState("");
   const [discount, setDiscount] = useState("0");
   const [loading, setLoading] = useState(false);
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    { name: "" },
+    customerGroupSchema
+  );
 
   async function load() {
     const res = await fetch("/api/customer-groups");
@@ -35,34 +41,41 @@ export function CustomerGroupsPanel() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/customer-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
+          name: data.name,
           discountPercent: parseFloat(discount) || 0,
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Group created");
-      setName("");
+      notify.success("Group created");
+      reset();
       setDiscount("0");
       load();
       router.refresh();
     } catch {
-      toast.error("Failed");
+      notify.error("Failed");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this group? Customers will be unassigned.")) return;
+    const confirmed = await confirmDelete(
+      "Delete customer group?",
+      "Customers in this group will be unassigned."
+    );
+    if (!confirmed) return;
     const res = await fetch(`/api/customer-groups/${id}`, { method: "DELETE" });
     if (res.ok) {
-      toast.success("Group deleted");
+      notify.success("Group deleted");
       load();
       router.refresh();
     }
@@ -74,25 +87,41 @@ export function CustomerGroupsPanel() {
         <CardTitle className="text-base">Customer Groups</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form onSubmit={handleCreate} className="flex flex-wrap gap-2 items-end">
-          <div className="space-y-1 flex-1 min-w-[120px]">
-            <Label className="text-xs">Group name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+        <form
+          onSubmit={handleCreate}
+          className="flex flex-wrap gap-2 items-end"
+          noValidate
+        >
+          <FormField
+            label="Group name"
+            htmlFor="groupName"
+            required
+            error={fieldError("name")}
+            className="flex-1 min-w-[120px]"
+          >
+            <FormInput
+              id="groupName"
+              name="groupName"
+              value={values.name}
+              error={fieldError("name")}
+              onChange={(e) => setField("name", e.target.value)}
               placeholder="Wholesale VIP"
-              required
             />
-          </div>
-          <div className="space-y-1 w-24">
-            <Label className="text-xs">Discount %</Label>
-            <Input
+          </FormField>
+          <FormField
+            label="Discount %"
+            htmlFor="discount"
+            className="w-24"
+          >
+            <FormInput
+              id="discount"
+              name="discount"
               type="number"
               step="0.01"
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
             />
-          </div>
+          </FormField>
           <Button type="submit" size="sm" disabled={loading}>
             <Plus className="h-4 w-4" />
           </Button>

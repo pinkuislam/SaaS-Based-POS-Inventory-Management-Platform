@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { stockTransferFormSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +18,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ArrowLeftRight } from "lucide-react";
 import type { SerializedProductStockOption } from "@/lib/serialize";
 
@@ -38,21 +36,39 @@ export function StockTransferDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [productId, setProductId] = useState("");
-  const [fromBranchId, setFromBranchId] = useState("");
-  const [toBranchId, setToBranchId] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [notes, setNotes] = useState("");
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    {
+      productId: "",
+      fromBranchId: "",
+      toBranchId: "",
+      quantity: "",
+      note: "",
+    },
+    stockTransferFormSchema
+  );
 
   if (branches.length < 2) return null;
 
+  const productOptions = products.map((p) => ({
+    value: p.id,
+    label: `${p.name} (stock: ${p.stockQty})`,
+  }));
+
+  const fromBranchOptions = [
+    { value: "", label: "Product's branch" },
+    ...branches.map((b) => ({ value: b.id, label: b.name })),
+  ];
+
+  const toBranchOptions = branches.map((b) => ({
+    value: b.id,
+    label: b.name,
+  }));
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const qty = parseFloat(quantity);
-    if (!productId || !toBranchId || !qty) {
-      toast.error("Fill all required fields");
-      return;
-    }
+    const data = validate();
+    if (!data) return;
 
     setLoading(true);
     try {
@@ -60,20 +76,21 @@ export function StockTransferDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId,
-          fromBranchId: fromBranchId || null,
-          toBranchId,
-          quantity: qty,
-          notes,
+          productId: data.productId,
+          fromBranchId: data.fromBranchId || null,
+          toBranchId: data.toBranchId,
+          quantity: parseFloat(data.quantity),
+          notes: data.note,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success(`Transfer complete (${data.reference})`);
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success(`Transfer complete (${resData.reference})`);
       setOpen(false);
+      reset();
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Transfer failed");
+      notify.error(e instanceof Error ? e.message : "Transfer failed");
     } finally {
       setLoading(false);
     }
@@ -81,7 +98,7 @@ export function StockTransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-2 rounded-lg border bg-background hover:bg-muted h-8 px-2.5 text-sm font-medium">
+      <DialogTrigger render={<Button variant="outline" />}>
         <ArrowLeftRight className="h-4 w-4" />
         Transfer Stock
       </DialogTrigger>
@@ -89,71 +106,63 @@ export function StockTransferDialog({
         <DialogHeader>
           <DialogTitle>Branch Stock Transfer</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Product *</Label>
-            <Select value={productId} onValueChange={(v) => v && setProductId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select product" />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} (stock: {p.stockQty})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>From branch</Label>
-            <Select
-              value={fromBranchId || "any"}
-              onValueChange={(v) => setFromBranchId(v === "any" ? "" : v || "")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Current / any" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Product&apos;s branch</SelectItem>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>To branch *</Label>
-            <Select value={toBranchId} onValueChange={(v) => v && setToBranchId(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Destination" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Quantity *</Label>
-            <Input
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormSelect2
+            label="Product"
+            htmlFor="productId"
+            required
+            options={productOptions}
+            value={values.productId}
+            onChange={(v) => setField("productId", v)}
+            placeholder="Select product"
+            searchable
+            error={fieldError("productId")}
+          />
+          <FormSelect2
+            label="From branch"
+            htmlFor="fromBranchId"
+            options={fromBranchOptions}
+            value={values.fromBranchId}
+            onChange={(v) => setField("fromBranchId", v)}
+            placeholder="Current / any"
+            error={fieldError("fromBranchId")}
+          />
+          <FormSelect2
+            label="To branch"
+            htmlFor="toBranchId"
+            required
+            options={toBranchOptions}
+            value={values.toBranchId}
+            onChange={(v) => setField("toBranchId", v)}
+            placeholder="Destination"
+            error={fieldError("toBranchId")}
+          />
+          <FormField
+            label="Quantity"
+            htmlFor="quantity"
+            required
+            error={fieldError("quantity")}
+          >
+            <FormInput
+              id="quantity"
+              name="quantity"
               type="number"
               min="0.001"
               step="any"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              required
+              value={values.quantity}
+              error={fieldError("quantity")}
+              onChange={(e) => setField("quantity", e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+          </FormField>
+          <FormField label="Notes" htmlFor="note" error={fieldError("note")}>
+            <FormInput
+              id="note"
+              name="note"
+              value={values.note}
+              error={fieldError("note")}
+              onChange={(e) => setField("note", e.target.value)}
+            />
+          </FormField>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Transferring..." : "Transfer Stock"}
           </Button>

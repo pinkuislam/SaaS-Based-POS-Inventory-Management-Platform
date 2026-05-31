@@ -196,6 +196,7 @@ export type SerializedSubscriptionPackage = {
   slug: string;
   description: string | null;
   price: number;
+  yearlyPrice: number | null;
   billingCycle: string;
   trialDays: number;
   graceDays: number;
@@ -204,9 +205,100 @@ export type SerializedSubscriptionPackage = {
   maxProducts: number;
   maxInvoices: number;
   features: string[];
+  isPopular: boolean;
   isActive: boolean;
   sortOrder: number;
 };
+
+/** Subscription row for admin edit dialog (no Prisma Decimal). */
+export type SerializedSubscription = {
+  id: string;
+  tenantId: string;
+  packageId: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  amount: number;
+};
+
+export function serializeSubscription(sub: {
+  id: string;
+  tenantId: string;
+  packageId: string;
+  status: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  amount: unknown;
+}): SerializedSubscription {
+  return {
+    id: sub.id,
+    tenantId: sub.tenantId,
+    packageId: sub.packageId,
+    status: sub.status,
+    startDate: toIsoDateString(sub.startDate) ?? "",
+    endDate: toIsoDateString(sub.endDate) ?? "",
+    amount: decimalToNumber(sub.amount),
+  };
+}
+
+/** Subscription payment row for admin edit dialog. */
+export type SerializedSubscriptionPayment = {
+  id: string;
+  subscriptionId: string;
+  amount: number;
+  method: string | null;
+  transactionId: string | null;
+  status: string;
+};
+
+export function serializeSubscriptionPayment(payment: {
+  id: string;
+  subscriptionId: string;
+  amount: unknown;
+  method: string | null;
+  transactionId: string | null;
+  status: string;
+}): SerializedSubscriptionPayment {
+  return {
+    id: payment.id,
+    subscriptionId: payment.subscriptionId,
+    amount: decimalToNumber(payment.amount),
+    method: payment.method,
+    transactionId: payment.transactionId,
+    status: payment.status,
+  };
+}
+
+/** Coupon row for admin edit dialog. */
+export type SerializedCoupon = {
+  id: string;
+  code: string;
+  discountType: string;
+  discountValue: number;
+  expiryDate: string | null;
+  usageLimit: number | null;
+  packageId: string | null;
+};
+
+export function serializeCoupon(coupon: {
+  id: string;
+  code: string;
+  discountType: string;
+  discountValue: unknown;
+  expiryDate: Date | string | null;
+  usageLimit: number | null;
+  packageId: string | null;
+}): SerializedCoupon {
+  return {
+    id: coupon.id,
+    code: coupon.code,
+    discountType: coupon.discountType,
+    discountValue: decimalToNumber(coupon.discountValue),
+    expiryDate: toIsoDateString(coupon.expiryDate),
+    usageLimit: coupon.usageLimit,
+    packageId: coupon.packageId,
+  };
+}
 
 export function serializeSubscriptionPackage(pkg: {
   id: string;
@@ -214,6 +306,7 @@ export function serializeSubscriptionPackage(pkg: {
   slug: string;
   description: string | null;
   price: unknown;
+  yearlyPrice?: unknown | null;
   billingCycle: string;
   trialDays: number;
   graceDays?: number;
@@ -222,6 +315,7 @@ export function serializeSubscriptionPackage(pkg: {
   maxProducts: number;
   maxInvoices: number;
   features: unknown;
+  isPopular?: boolean;
   isActive: boolean;
   sortOrder: number;
 }): SerializedSubscriptionPackage {
@@ -231,6 +325,8 @@ export function serializeSubscriptionPackage(pkg: {
     slug: pkg.slug,
     description: pkg.description,
     price: decimalToNumber(pkg.price),
+    yearlyPrice:
+      pkg.yearlyPrice != null ? decimalToNumber(pkg.yearlyPrice) : null,
     billingCycle: pkg.billingCycle,
     trialDays: pkg.trialDays,
     graceDays: pkg.graceDays ?? 7,
@@ -239,6 +335,7 @@ export function serializeSubscriptionPackage(pkg: {
     maxProducts: pkg.maxProducts,
     maxInvoices: pkg.maxInvoices,
     features: Array.isArray(pkg.features) ? (pkg.features as string[]) : [],
+    isPopular: pkg.isPopular ?? false,
     isActive: pkg.isActive,
     sortOrder: pkg.sortOrder,
   };

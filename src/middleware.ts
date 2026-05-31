@@ -1,6 +1,12 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { authConfig } from "@/auth.config";
+import { isMaintenanceBypassPath } from "@/lib/maintenance-paths";
+import {
+  getCachedMaintenanceEnabled,
+  setCachedMaintenanceEnabled,
+} from "@/lib/maintenance-cache";
 import { getTenantSlugFromHost } from "@/lib/tenant-host";
 import {
   getTenantSlugFromPath,
@@ -8,7 +14,6 @@ import {
   isTenantPanelPath,
   isTenantRootPath,
   legacyDashboardToTenantPath,
-  tenantDashboardPath,
   tenantHomePath,
 } from "@/lib/tenant-path";
 import { canAccessRoute } from "@/lib/route-permissions";
@@ -16,8 +21,58 @@ import { toLegacyDashboardPath } from "@/lib/tenant-path";
 
 const { auth } = NextAuth(authConfig);
 
-export default auth((req) => {
+async function isMaintenanceEnabled(req: NextRequest): Promise<boolean> {
+  const cached = getCachedMaintenanceEnabled();
+  if (cached !== null) return cached;
+
+  try {
+    const statusUrl = new URL("/api/public/maintenance", req.url);
+    const res = await fetch(statusUrl, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return false;
+
+    const data = (await res.json()) as { maintenanceMode?: boolean };
+    const enabled = data.maintenanceMode === true;
+    setCachedMaintenanceEnabled(enabled);
+    return enabled;
+  } catch {
+    return false;
+  }
+}
+
+async function getMaintenanceRedirect(
+  req: NextRequest
+): Promise<NextResponse | null> {
   const { pathname } = req.nextUrl;
+
+  if (isMaintenanceBypassPath(pathname)) {
+    return null;
+  }
+
+  if (pathname.startsWith("/maintenance")) {
+    return null;
+  }
+
+  const enabled = await isMaintenanceEnabled(req);
+  if (!enabled) return null;
+
+  return NextResponse.redirect(new URL("/maintenance", req.url));
+}
+
+export default auth(async (req) => {
+  const maintenanceRedirect = await getMaintenanceRedirect(req);
+  if (maintenanceRedirect) {
+    return maintenanceRedirect;
+  }
+
+  const { pathname } = req.nextUrl;
+
+  if (pathname.startsWith("/maintenance")) {
+    return NextResponse.next();
+  }
+
   const session = req.auth;
   const isLoggedIn = !!session;
   const host = req.headers.get("host") || "";
@@ -143,6 +198,10 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
+    "/",
+    "/maintenance",
+    "/forgot-password",
+    "/reset-password",
     "/admin",
     "/admin/:path*",
     "/dashboard",

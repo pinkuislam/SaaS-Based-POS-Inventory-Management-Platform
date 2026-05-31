@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
+import { useValidatedForm } from "@/hooks/use-validated-form";
+import { barcodePrintSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -24,9 +25,15 @@ export function BarcodePrintDialog({
   >;
 }) {
   const [open, setOpen] = useState(false);
-  const [copies, setCopies] = useState("1");
-  const [code, setCode] = useState(product.barcode || product.sku || product.id);
   const printRef = useRef<HTMLDivElement>(null);
+
+  const { values: form, setField, validate, fieldError: fe } = useValidatedForm(
+    {
+      copies: "1",
+      code: product.barcode || product.sku || product.id,
+    },
+    barcodePrintSchema
+  );
 
   useEffect(() => {
     if (!open || !printRef.current) return;
@@ -37,7 +44,7 @@ export function BarcodePrintDialog({
         "svg"
       );
       try {
-        JsBarcode(svg, code, {
+        JsBarcode(svg, form.code, {
           format: "CODE128",
           width: 1.5,
           height: 50,
@@ -51,9 +58,10 @@ export function BarcodePrintDialog({
         container.textContent = "Invalid barcode";
       }
     });
-  }, [open, code, copies]);
+  }, [open, form.code, form.copies]);
 
   function handlePrint() {
+    if (!validate()) return;
     const content = printRef.current?.innerHTML;
     if (!content) return;
     const win = window.open("", "_blank");
@@ -71,11 +79,13 @@ export function BarcodePrintDialog({
     win.print();
   }
 
-  const numCopies = Math.min(parseInt(copies) || 1, 50);
+  const numCopies = Math.min(parseInt(form.copies) || 1, 50);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 w-8">
+      <DialogTrigger
+        className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 w-8"
+      >
         <Barcode className="h-4 w-4" />
       </DialogTrigger>
       <DialogContent className="max-w-lg">
@@ -83,35 +93,50 @@ export function BarcodePrintDialog({
           <DialogTitle>Print Barcode Label</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Barcode value</Label>
-            <Input value={code} onChange={(e) => setCode(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Number of labels</Label>
-            <Input
-              type="number"
-              min="1"
-              max="50"
-              value={copies}
-              onChange={(e) => setCopies(e.target.value)}
+          <FormField
+            label="Barcode value"
+            htmlFor="code"
+            required
+            error={fe("code")}
+          >
+            <FormInput
+              id="code"
+              value={form.code}
+              error={fe("code")}
+              onChange={(e) => setField("code", e.target.value)}
             />
-          </div>
+          </FormField>
+          <FormField
+            label="Number of copies"
+            htmlFor="copies"
+            required
+            error={fe("copies")}
+          >
+            <FormInput
+              id="copies"
+              type="number"
+              min={1}
+              max={50}
+              value={form.copies}
+              error={fe("copies")}
+              onChange={(e) => setField("copies", e.target.value)}
+            />
+          </FormField>
           <div
             ref={printRef}
-            className="flex flex-wrap gap-2 justify-center p-4 border rounded-lg bg-white"
+            className="flex flex-wrap gap-2 border rounded-lg p-4 bg-white"
           >
             {Array.from({ length: numCopies }).map((_, i) => (
-              <div key={i} className="label text-center p-2 border border-dashed w-[180px]">
+              <div key={i} className="label inline-block text-center p-2 border border-dashed w-[180px]">
                 <div className="name text-xs font-bold mb-1">{product.name}</div>
-                <div className="barcode-canvas flex justify-center" />
+                <div className="barcode-canvas" />
                 <div className="price text-[10px] mt-1">
-                  {product.sku && `SKU: ${product.sku}`}
+                  ৳{Number(product.sellingPrice).toFixed(2)}
                 </div>
               </div>
             ))}
           </div>
-          <Button onClick={handlePrint} className="w-full">
+          <Button type="button" className="w-full" onClick={handlePrint}>
             Print Labels
           </Button>
         </div>

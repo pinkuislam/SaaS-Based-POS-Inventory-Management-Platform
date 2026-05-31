@@ -3,54 +3,92 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { resetPasswordSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { FormField, FormInput } from "@/components/ui/form-field";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 function ResetForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { values, setField, validate, fieldError } = useValidatedForm(
+    {
+      password: "",
+      confirmPassword: "",
+    },
+    resetPasswordSchema
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) {
-      toast.error("Invalid reset link");
+      notify.error("Invalid reset link");
       return;
     }
+
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, password: data.password }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success("Password updated. You can sign in now.");
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success("Password updated. You can sign in now.");
       window.location.href = "/login";
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Reset failed");
+      notify.error(e instanceof Error ? e.message : "Reset failed");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label>New Password</Label>
-        <Input
+    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <FormField
+        label="New Password"
+        htmlFor="password"
+        required
+        error={fieldError("password")}
+      >
+        <FormInput
+          id="password"
+          name="password"
           type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          minLength={6}
-          required
+          value={values.password}
+          error={fieldError("password")}
+          onChange={(e) => setField("password", e.target.value)}
         />
-      </div>
+      </FormField>
+      <FormField
+        label="Confirm Password"
+        htmlFor="confirmPassword"
+        required
+        error={fieldError("confirmPassword")}
+      >
+        <FormInput
+          id="confirmPassword"
+          name="confirmPassword"
+          type="password"
+          value={values.confirmPassword}
+          error={fieldError("confirmPassword")}
+          onChange={(e) => setField("confirmPassword", e.target.value)}
+        />
+      </FormField>
       <Button type="submit" className="w-full" disabled={loading || !token}>
         {loading ? "Updating..." : "Reset Password"}
       </Button>
@@ -70,7 +108,10 @@ export default function ResetPasswordPage() {
           <Suspense fallback={<p className="text-sm">Loading...</p>}>
             <ResetForm />
           </Suspense>
-          <Link href="/login" className="text-sm text-primary block mt-4 text-center">
+          <Link
+            href="/login"
+            className="text-sm text-primary block mt-4 text-center"
+          >
             Back to login
           </Link>
         </CardContent>

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { useValidatedForm } from "@/hooks/use-validated-form";
+import { packageSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  FormField,
+  FormInput,
+  FormTextarea,
+  FormSelect2,
+  FormSelect2Multi,
+} from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -15,32 +21,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus, Pencil } from "lucide-react";
 import type { SerializedSubscriptionPackage } from "@/lib/serialize";
+import {
+  mergeFeatureOptions,
+  resolvePackageFeatureKeys,
+  type PlatformFeatureOption,
+} from "@/lib/admin/package-feature-options";
 
 type PackageData = SerializedSubscriptionPackage;
 
-export function PackageFormDialog({
-  pkg,
-  mode = "create",
-}: {
-  pkg?: PackageData;
-  mode?: "create" | "edit";
-}) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
+const BILLING_OPTIONS = [
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Yearly" },
+];
+
+function buildInitial(
+  pkg: PackageData | undefined,
+  catalog: { key: string; name: string }[]
+) {
+  return {
     name: pkg?.name || "",
     description: pkg?.description || "",
     price: pkg ? String(pkg.price) : "",
+    yearlyPrice: pkg?.yearlyPrice != null ? String(pkg.yearlyPrice) : "",
     billingCycle: pkg?.billingCycle || "monthly",
     trialDays: String(pkg?.trialDays ?? 14),
     graceDays: String(pkg?.graceDays ?? 7),
@@ -48,32 +52,84 @@ export function PackageFormDialog({
     maxBranches: String(pkg?.maxBranches ?? 1),
     maxProducts: String(pkg?.maxProducts ?? 500),
     maxInvoices: String(pkg?.maxInvoices ?? 1000),
-    features: pkg?.features?.length ? pkg.features.join(", ") : "",
+    featureKeys: resolvePackageFeatureKeys(pkg?.features ?? [], catalog),
     isActive: pkg?.isActive ?? true,
+    isPopular: pkg?.isPopular ?? false,
     sortOrder: String(pkg?.sortOrder ?? 0),
-  });
+  };
+}
+
+export function PackageFormDialog({
+  pkg,
+  mode = "create",
+  featureOptions,
+  featureCatalog,
+}: {
+  pkg?: PackageData;
+  mode?: "create" | "edit";
+  featureOptions: PlatformFeatureOption[];
+  featureCatalog: { key: string; name: string }[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const catalog = featureCatalog;
+
+  const selectOptions = useMemo(() => {
+    const keys = resolvePackageFeatureKeys(pkg?.features ?? [], catalog);
+    return mergeFeatureOptions(featureOptions, keys).map((o) => ({
+      value: o.value,
+      label: o.label,
+    }));
+  }, [featureOptions, pkg?.features, catalog]);
+
+  const initial = useMemo(
+    () => buildInitial(pkg, catalog),
+    [pkg, catalog]
+  );
+
+  const { values: form, setField, validate, fieldError: fe, reset } =
+    useValidatedForm(initial, packageSchema);
+
+  useEffect(() => {
+    if (open) {
+      reset(buildInitial(pkg, catalog));
+    }
+  }, [open, pkg, catalog, reset]);
+
+  const nameByKey = useMemo(
+    () => Object.fromEntries(catalog.map((c) => [c.key, c.name])),
+    [catalog]
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
 
+    const features = (data.featureKeys ?? []).map(
+      (key) => nameByKey[key] ?? key
+    );
+
     const payload = {
-      name: form.name,
-      description: form.description,
-      price: parseFloat(form.price),
-      billingCycle: form.billingCycle,
-      trialDays: parseInt(form.trialDays, 10),
-      graceDays: parseInt(form.graceDays, 10),
-      maxUsers: parseInt(form.maxUsers, 10),
-      maxBranches: parseInt(form.maxBranches, 10),
-      maxProducts: parseInt(form.maxProducts, 10),
-      maxInvoices: parseInt(form.maxInvoices, 10),
-      features: form.features
-        .split(",")
-        .map((f) => f.trim())
-        .filter(Boolean),
-      isActive: form.isActive,
-      sortOrder: parseInt(form.sortOrder, 10),
+      name: data.name,
+      description: data.description,
+      price: parseFloat(data.price),
+      yearlyPrice: data.yearlyPrice ? parseFloat(data.yearlyPrice) : null,
+      billingCycle: data.billingCycle,
+      trialDays: parseInt(data.trialDays || "14", 10),
+      graceDays: parseInt(data.graceDays || "7", 10),
+      maxUsers: parseInt(data.maxUsers || "2", 10),
+      maxBranches: parseInt(data.maxBranches || "1", 10),
+      maxProducts: parseInt(data.maxProducts || "500", 10),
+      maxInvoices: parseInt(data.maxInvoices || "1000", 10),
+      features,
+      isActive: data.isActive ?? true,
+      isPopular: data.isPopular ?? false,
+      sortOrder: parseInt(data.sortOrder || "0", 10),
     };
 
     try {
@@ -86,13 +142,13 @@ export function PackageFormDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success(mode === "edit" ? "Package updated" : "Package created");
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success(mode === "edit" ? "Package updated" : "Package created");
       setOpen(false);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      notify.error(e instanceof Error ? e.message : "Failed");
     } finally {
       setLoading(false);
     }
@@ -123,126 +179,189 @@ export function PackageFormDialog({
             {mode === "edit" ? "Edit Package" : "Create Package"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Name *</Label>
-            <Input
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField label="Name" htmlFor="name" required error={fe("name")}>
+            <FormInput
+              id="name"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
+              error={fe("name")}
+              onChange={(e) => setField("name", e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea
+          </FormField>
+          <FormField
+            label="Description"
+            htmlFor="description"
+            error={fe("description")}
+          >
+            <FormTextarea
+              id="description"
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              error={fe("description")}
+              onChange={(e) => setField("description", e.target.value)}
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Price *</Label>
-              <Input
+            <FormField label="Price" htmlFor="price" required error={fe("price")}>
+              <FormInput
+                id="price"
                 type="number"
                 step="0.01"
                 value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                required
+                error={fe("price")}
+                onChange={(e) => setField("price", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Billing</Label>
-              <Select
-                value={form.billingCycle}
-                onValueChange={(v) => v && setForm({ ...form, billingCycle: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            </FormField>
+            <FormField
+              label="Yearly Price"
+              htmlFor="yearlyPrice"
+              error={fe("yearlyPrice")}
+            >
+              <FormInput
+                id="yearlyPrice"
+                type="number"
+                step="0.01"
+                placeholder="Optional"
+                value={form.yearlyPrice}
+                error={fe("yearlyPrice")}
+                onChange={(e) => setField("yearlyPrice", e.target.value)}
+              />
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Trial Days</Label>
-              <Input
-                type="number"
-                value={form.trialDays}
-                onChange={(e) => setForm({ ...form, trialDays: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Grace Days (after expiry)</Label>
-              <Input
-                type="number"
-                value={form.graceDays}
-                onChange={(e) => setForm({ ...form, graceDays: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Sort Order</Label>
-              <Input
+            <FormSelect2
+              label="Default Billing"
+              htmlFor="billingCycle"
+              required
+              error={fe("billingCycle")}
+              options={BILLING_OPTIONS}
+              value={form.billingCycle}
+              onChange={(v) => setField("billingCycle", v)}
+              searchable={false}
+            />
+            <FormField
+              label="Sort Order"
+              htmlFor="sortOrder"
+              error={fe("sortOrder")}
+            >
+              <FormInput
+                id="sortOrder"
                 type="number"
                 value={form.sortOrder}
-                onChange={(e) => setForm({ ...form, sortOrder: e.target.value })}
+                error={fe("sortOrder")}
+                onChange={(e) => setField("sortOrder", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Max Users</Label>
-              <Input
+            <FormField
+              label="Trial Days"
+              htmlFor="trialDays"
+              error={fe("trialDays")}
+            >
+              <FormInput
+                id="trialDays"
+                type="number"
+                value={form.trialDays}
+                error={fe("trialDays")}
+                onChange={(e) => setField("trialDays", e.target.value)}
+              />
+            </FormField>
+            <FormField
+              label="Grace Days (after expiry)"
+              htmlFor="graceDays"
+              error={fe("graceDays")}
+            >
+              <FormInput
+                id="graceDays"
+                type="number"
+                value={form.graceDays}
+                error={fe("graceDays")}
+                onChange={(e) => setField("graceDays", e.target.value)}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              label="Max Users"
+              htmlFor="maxUsers"
+              error={fe("maxUsers")}
+            >
+              <FormInput
+                id="maxUsers"
                 type="number"
                 value={form.maxUsers}
-                onChange={(e) => setForm({ ...form, maxUsers: e.target.value })}
+                error={fe("maxUsers")}
+                onChange={(e) => setField("maxUsers", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Branches</Label>
-              <Input
+            </FormField>
+            <FormField
+              label="Max Branches"
+              htmlFor="maxBranches"
+              error={fe("maxBranches")}
+            >
+              <FormInput
+                id="maxBranches"
                 type="number"
                 value={form.maxBranches}
-                onChange={(e) => setForm({ ...form, maxBranches: e.target.value })}
+                error={fe("maxBranches")}
+                onChange={(e) => setField("maxBranches", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Max Products</Label>
-              <Input
+            <FormField
+              label="Max Products"
+              htmlFor="maxProducts"
+              error={fe("maxProducts")}
+            >
+              <FormInput
+                id="maxProducts"
                 type="number"
                 value={form.maxProducts}
-                onChange={(e) => setForm({ ...form, maxProducts: e.target.value })}
+                error={fe("maxProducts")}
+                onChange={(e) => setField("maxProducts", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Invoices</Label>
-              <Input
+            </FormField>
+            <FormField
+              label="Max Invoices"
+              htmlFor="maxInvoices"
+              error={fe("maxInvoices")}
+            >
+              <FormInput
+                id="maxInvoices"
                 type="number"
                 value={form.maxInvoices}
-                onChange={(e) => setForm({ ...form, maxInvoices: e.target.value })}
+                error={fe("maxInvoices")}
+                onChange={(e) => setField("maxInvoices", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
-          <div className="space-y-2">
-            <Label>Features (comma-separated)</Label>
-            <Input
-              value={form.features}
-              onChange={(e) => setForm({ ...form, features: e.target.value })}
-              placeholder="POS, Inventory, Reports"
-            />
+          <FormSelect2Multi
+            label="Package Features"
+            htmlFor="featureKeys"
+            error={fe("featureKeys")}
+            description="Select platform features included in this plan"
+            options={selectOptions}
+            value={form.featureKeys}
+            onChange={(keys) => setField("featureKeys", keys)}
+            placeholder="Select features..."
+          />
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={form.isActive}
+                onCheckedChange={(c) => setField("isActive", c === true)}
+              />
+              Active package
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={form.isPopular}
+                onCheckedChange={(c) => setField("isPopular", c === true)}
+              />
+              Mark as popular
+            </label>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={form.isActive}
-              onCheckedChange={(c) => setForm({ ...form, isActive: c === true })}
-            />
-            Active package
-          </label>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : mode === "edit" ? "Update" : "Create"}
           </Button>

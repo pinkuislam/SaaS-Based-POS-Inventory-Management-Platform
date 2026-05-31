@@ -1,7 +1,18 @@
-export default function AdminRootLayout({
+"use client";
+
+import { usePathname } from "next/navigation";
+import { AdminShell } from "@/components/layouts/admin-shell";
+
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  const pathname = usePathname();
+
+  if (pathname === "/admin/login") {
+    return <>{children}</>;
+  }
+
+  return <AdminShell>{children}</AdminShell>;
 }

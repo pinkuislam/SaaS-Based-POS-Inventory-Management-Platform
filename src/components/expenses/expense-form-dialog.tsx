@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { expenseFormSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +18,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus } from "lucide-react";
 
 interface Category {
@@ -31,46 +29,69 @@ export function ExpenseFormDialog({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [useNewCategory, setUseNewCategory] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    amount: "",
-    categoryId: "",
-    categoryName: "",
-    expenseDate: new Date().toISOString().split("T")[0],
-    notes: "",
-  });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.title,
-          amount: parseFloat(form.amount),
-          categoryId: useNewCategory ? null : form.categoryId || null,
-          categoryName: useNewCategory ? form.categoryName : null,
-          expenseDate: form.expenseDate,
-          notes: form.notes,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      toast.success("Expense recorded");
-      setOpen(false);
-      setForm({
+  const { values, setField, validate, fieldError, reset, setValues } =
+    useValidatedForm(
+      {
         title: "",
         amount: "",
         categoryId: "",
         categoryName: "",
         expenseDate: new Date().toISOString().split("T")[0],
         notes: "",
+        useNewCategory: false,
+      },
+      expenseFormSchema
+    );
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+
+  function toggleNewCategory() {
+    setValues((prev) => ({
+      ...prev,
+      useNewCategory: !prev.useNewCategory,
+      categoryId: "",
+      categoryName: "",
+    }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: data.title,
+          amount: parseFloat(data.amount),
+          categoryId: data.useNewCategory ? null : data.categoryId || null,
+          categoryName: data.useNewCategory ? data.categoryName : null,
+          expenseDate: data.expenseDate,
+          notes: data.notes,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      notify.success("Expense recorded");
+      setOpen(false);
+      reset({
+        title: "",
+        amount: "",
+        categoryId: "",
+        categoryName: "",
+        expenseDate: new Date().toISOString().split("T")[0],
+        notes: "",
+        useNewCategory: false,
       });
       router.refresh();
     } catch {
-      toast.error("Failed to save expense");
+      notify.error("Failed to save expense");
     } finally {
       setLoading(false);
     }
@@ -78,7 +99,7 @@ export function ExpenseFormDialog({ categories }: { categories: Category[] }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 px-2.5 text-sm font-medium">
+      <DialogTrigger render={<Button />}>
         <Plus className="h-4 w-4" />
         Add Expense
       </DialogTrigger>
@@ -86,83 +107,100 @@ export function ExpenseFormDialog({ categories }: { categories: Category[] }) {
         <DialogHeader>
           <DialogTitle>Record Expense</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Title *</Label>
-            <Input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField
+            label="Title"
+            htmlFor="title"
+            required
+            error={fieldError("title")}
+          >
+            <FormInput
+              id="title"
+              name="title"
+              value={values.title}
+              error={fieldError("title")}
+              onChange={(e) => setField("title", e.target.value)}
               placeholder="e.g. Electricity bill"
-              required
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Amount *</Label>
-              <Input
+            <FormField
+              label="Amount"
+              htmlFor="amount"
+              required
+              error={fieldError("amount")}
+            >
+              <FormInput
+                id="amount"
+                name="amount"
                 type="number"
                 step="0.01"
                 min="0"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                required
+                value={values.amount}
+                error={fieldError("amount")}
+                onChange={(e) => setField("amount", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input
+            </FormField>
+            <FormField
+              label="Date"
+              htmlFor="expenseDate"
+              error={fieldError("expenseDate")}
+            >
+              <FormInput
+                id="expenseDate"
+                name="expenseDate"
                 type="date"
-                value={form.expenseDate}
-                onChange={(e) =>
-                  setForm({ ...form, expenseDate: e.target.value })
-                }
+                value={values.expenseDate}
+                error={fieldError("expenseDate")}
+                onChange={(e) => setField("expenseDate", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Category</Label>
+              <span className="text-sm font-medium">Category</span>
               <button
                 type="button"
                 className="text-xs text-primary hover:underline"
-                onClick={() => setUseNewCategory(!useNewCategory)}
+                onClick={toggleNewCategory}
               >
-                {useNewCategory ? "Use existing" : "New category"}
+                {values.useNewCategory ? "Use existing" : "New category"}
               </button>
             </div>
-            {useNewCategory ? (
-              <Input
-                value={form.categoryName}
-                onChange={(e) =>
-                  setForm({ ...form, categoryName: e.target.value })
-                }
-                placeholder="Category name"
-              />
-            ) : (
-              <Select
-                value={form.categoryId}
-                onValueChange={(v) => v && setForm({ ...form, categoryId: v })}
+            {values.useNewCategory ? (
+              <FormField
+                htmlFor="categoryName"
+                error={fieldError("categoryName")}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <FormInput
+                  id="categoryName"
+                  name="categoryName"
+                  value={values.categoryName}
+                  error={fieldError("categoryName")}
+                  onChange={(e) => setField("categoryName", e.target.value)}
+                  placeholder="Category name"
+                />
+              </FormField>
+            ) : (
+              <FormSelect2
+                htmlFor="categoryId"
+                options={categoryOptions}
+                value={values.categoryId}
+                onChange={(v) => setField("categoryId", v)}
+                placeholder="Select category"
+                error={fieldError("categoryId")}
+              />
             )}
           </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Input
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          <FormField label="Notes" htmlFor="notes" error={fieldError("notes")}>
+            <FormInput
+              id="notes"
+              name="notes"
+              value={values.notes}
+              error={fieldError("notes")}
+              onChange={(e) => setField("notes", e.target.value)}
             />
-          </div>
+          </FormField>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Save Expense"}
           </Button>

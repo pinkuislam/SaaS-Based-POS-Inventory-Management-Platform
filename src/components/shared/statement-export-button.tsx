@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 
@@ -31,9 +31,9 @@ export function StatementExportButton({
       a.download = `${entityType.slice(0, -1)}-statement-${entityId}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Statement downloaded");
+      notify.success("Statement downloaded");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Export failed");
+      notify.error(e instanceof Error ? e.message : "Export failed");
     } finally {
       setLoading(false);
     }

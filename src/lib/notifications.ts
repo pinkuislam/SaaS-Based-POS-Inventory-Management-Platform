@@ -36,7 +36,7 @@ export async function syncLowStockNotifications(tenantId: string) {
     select: { name: true, email: true },
   });
 
-  if (isEmailConfigured() && tenant?.email && lowStock.length > 0) {
+  if ((await isEmailConfigured()) && tenant?.email && lowStock.length > 0) {
     const emailedToday = await prisma.notification.findFirst({
       where: {
         tenantId,

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { saleReturnSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,11 @@ export function SaleReturnDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [returnQtys, setReturnQtys] = useState<Record<string, string>>({});
-  const [returnReason, setReturnReason] = useState("");
+
+  const { values, setField } = useValidatedForm(
+    { returnReason: "" },
+    saleReturnSchema
+  );
 
   if (status === "RETURNED" || status === "CANCELLED") {
     return null;
@@ -57,17 +62,17 @@ export function SaleReturnDialog({
       const res = await fetch(`/api/sales/${saleId}/return`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returnReason }),
+        body: JSON.stringify({ returnReason: values.returnReason }),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error);
       }
-      toast.success(`Full return processed for ${invoiceNo}`);
+      notify.success(`Full return processed for ${invoiceNo}`);
       setOpen(false);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Return failed");
+      notify.error(e instanceof Error ? e.message : "Return failed");
     } finally {
       setLoading(false);
     }
@@ -83,7 +88,7 @@ export function SaleReturnDialog({
       .filter((i) => i.quantity > 0);
 
     if (returnItems.length === 0) {
-      toast.error("Enter quantities to return");
+      notify.error("Enter quantities to return");
       return;
     }
 
@@ -92,17 +97,20 @@ export function SaleReturnDialog({
       const res = await fetch(`/api/sales/${saleId}/return`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: returnItems, returnReason }),
+        body: JSON.stringify({
+          items: returnItems,
+          returnReason: values.returnReason,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error);
       }
-      toast.success("Return processed — stock restored");
+      notify.success("Return processed — stock restored");
       setOpen(false);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Return failed");
+      notify.error(e instanceof Error ? e.message : "Return failed");
     } finally {
       setLoading(false);
     }
@@ -110,7 +118,7 @@ export function SaleReturnDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 px-2 text-sm">
+      <DialogTrigger render={<Button variant="ghost" size="sm" />}>
         <RotateCcw className="h-4 w-4" />
       </DialogTrigger>
       <DialogContent className="max-w-md">
@@ -118,14 +126,19 @@ export function SaleReturnDialog({
           <DialogTitle>Return — {invoiceNo}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Return reason</Label>
-            <Input
-              value={returnReason}
-              onChange={(e) => setReturnReason(e.target.value)}
+          <FormField
+            label="Return reason"
+            htmlFor="returnReason"
+            error={undefined}
+          >
+            <FormInput
+              id="returnReason"
+              name="returnReason"
+              value={values.returnReason}
+              onChange={(e) => setField("returnReason", e.target.value)}
               placeholder="e.g. Defective, Wrong item"
             />
-          </div>
+          </FormField>
           <Button
             variant="outline"
             className="w-full"
@@ -146,17 +159,17 @@ export function SaleReturnDialog({
             </div>
           </div>
 
-          <form onSubmit={handlePartialReturn} className="space-y-3">
+          <form onSubmit={handlePartialReturn} className="space-y-3" noValidate>
             {returnableItems.map((item) =>
               item.maxReturn > 0 ? (
                 <div key={item.id} className="flex items-center gap-2">
-                  <Label className="flex-1 text-sm truncate">
+                  <span className="flex-1 text-sm truncate">
                     {item.product.name}
                     <span className="text-muted-foreground ml-1">
                       (max {item.maxReturn})
                     </span>
-                  </Label>
-                  <Input
+                  </span>
+                  <FormInput
                     type="number"
                     min="0"
                     max={item.maxReturn}

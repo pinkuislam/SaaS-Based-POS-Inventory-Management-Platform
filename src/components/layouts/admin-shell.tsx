@@ -11,6 +11,19 @@ import {
   Settings,
   LogOut,
   Menu,
+  Sparkles,
+  Receipt,
+  Ticket,
+  Users,
+  Shield,
+  Bell,
+  BarChart3,
+  Database,
+  HardDrive,
+  Activity,
+  Wrench,
+  FileText,
+  Tag,
 } from "lucide-react";
 import { SidebarNav, type NavItem } from "./sidebar-nav";
 import { Button } from "@/components/ui/button";
@@ -28,11 +41,25 @@ const navItems: NavItem[] = [
   { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { title: "Tenants", href: "/admin/tenants", icon: Building2 },
   { title: "Packages", href: "/admin/packages", icon: Package },
+  { title: "Features", href: "/admin/features", icon: Sparkles },
   { title: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard },
   { title: "Payments", href: "/admin/payments", icon: CreditCard },
-  { title: "Billing", href: "/admin/billing", icon: CreditCard },
+  { title: "Invoices", href: "/admin/invoices", icon: Receipt },
+  { title: "Coupons", href: "/admin/coupons", icon: Tag },
+  { title: "Admin Users", href: "/admin/users", icon: Users },
+  { title: "Roles & Permissions", href: "/admin/roles", icon: Shield },
   { title: "Support", href: "/admin/support", icon: HeadphonesIcon },
+  { title: "Announcements", href: "/admin/announcements", icon: FileText },
+  { title: "Notifications", href: "/admin/notifications", icon: Bell },
+  { title: "Reports", href: "/admin/reports", icon: BarChart3 },
+  { title: "Databases", href: "/admin/databases", icon: Database },
+  { title: "Integrations", href: "/admin/integrations", icon: Settings },
+  { title: "Storage", href: "/admin/storage", icon: HardDrive },
+  { title: "Activity Logs", href: "/admin/activity", icon: Activity },
+  { title: "Security", href: "/admin/security", icon: Shield },
   { title: "Settings", href: "/admin/settings", icon: Settings },
+  { title: "Maintenance", href: "/admin/maintenance", icon: Wrench },
+  { title: "Billing", href: "/admin/billing", icon: Ticket },
 ];
 
 function SidebarContent() {
@@ -89,6 +116,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => (window.location.href = "/admin/settings")}>
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => signOut({ callbackUrl: "/admin/login" })}
                 className="text-destructive"

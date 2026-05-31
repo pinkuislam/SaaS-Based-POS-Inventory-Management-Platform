@@ -20,6 +20,9 @@
 # production
 /build
 
+# tenant DB backups
+/storage/backups/
+
 # misc
 .DS_Store
 *.pem

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "sweetalert2/dist/sweetalert2.min.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -127,4 +128,33 @@
   html {
     @apply font-sans;
   }
+}
+
+/* SweetAlert2 — match app theme */
+.swal2-popup-themed {
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-sans);
+}
+.swal2-popup-themed .swal2-title {
+  color: var(--foreground) !important;
+}
+.swal2-popup-themed .swal2-html-container {
+  color: var(--muted-foreground) !important;
+}
+.swal2-confirm-themed,
+.swal2-confirm-delete {
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+}
+.swal2-confirm-delete {
+  background: var(--destructive) !important;
+  color: white !important;
+}
+.swal2-cancel-themed {
+  border-radius: var(--radius-md) !important;
+  background: var(--muted) !important;
+  color: var(--foreground) !important;
 }

@@ -2,19 +2,76 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { DEFAULT_ROLES } from "../src/lib/permissions";
 import { prisma } from "../src/lib/db";
+import {
+  DEFAULT_PLATFORM_FEATURES,
+  DEFAULT_ADMIN_ROLES,
+} from "../src/lib/admin/platform-features";
+import { PLATFORM_SETTING_KEYS } from "../src/lib/admin/platform-setting-keys";
 
 async function main() {
   const password = await bcrypt.hash("password123", 10);
 
+  for (const role of DEFAULT_ADMIN_ROLES) {
+    await prisma.adminRole.upsert({
+      where: { name: role.name },
+      update: {
+        description: role.description,
+        permissions: role.permissions,
+      },
+      create: {
+        name: role.name,
+        description: role.description,
+        permissions: role.permissions,
+      },
+    });
+  }
+
+  const adminOwnerRole = await prisma.adminRole.findUnique({
+    where: { name: "Owner" },
+  });
+
   await prisma.superAdmin.upsert({
     where: { email: "admin@platform.com" },
-    update: {},
+    update: { isPrimary: true, roleId: adminOwnerRole?.id },
     create: {
       email: "admin@platform.com",
       password,
       name: "Super Admin",
+      isPrimary: true,
+      roleId: adminOwnerRole?.id,
     },
   });
+
+  for (let i = 0; i < DEFAULT_PLATFORM_FEATURES.length; i++) {
+    const f = DEFAULT_PLATFORM_FEATURES[i];
+    await prisma.platformFeature.upsert({
+      where: { key: f.key },
+      update: { name: f.name, module: f.module },
+      create: {
+        key: f.key,
+        name: f.name,
+        module: f.module,
+        sortOrder: i,
+      },
+    });
+  }
+
+  const defaultSettings: Record<string, string> = {
+    [PLATFORM_SETTING_KEYS.platformName]: "InventoryPOS",
+    [PLATFORM_SETTING_KEYS.platformEmail]: "admin@platform.com",
+    [PLATFORM_SETTING_KEYS.supportEmail]: "support@platform.com",
+    [PLATFORM_SETTING_KEYS.currency]: "BDT",
+    [PLATFORM_SETTING_KEYS.timezone]: "Asia/Dhaka",
+    [PLATFORM_SETTING_KEYS.defaultTrialDays]: "14",
+    [PLATFORM_SETTING_KEYS.defaultGraceDays]: "7",
+  };
+  for (const [key, value] of Object.entries(defaultSettings)) {
+    await prisma.systemSetting.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+  }
 
   const packages = [
     {

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { confirmDelete } from "@/lib/confirm";
+import { apiKeySchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -28,9 +30,13 @@ type ApiKeyRow = {
 
 export function ApiKeysManager({ hasApiAccess }: { hasApiAccess: boolean }) {
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    { name: "" },
+    apiKeySchema
+  );
 
   async function loadKeys() {
     const res = await fetch("/api/tenant/api-keys");
@@ -43,33 +49,40 @@ export function ApiKeysManager({ hasApiAccess }: { hasApiAccess: boolean }) {
 
   async function createKey(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/tenant/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: data.name }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setNewKey(data.apiKey);
-      setName("");
-      toast.success("API key created — copy it now");
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      setNewKey(resData.apiKey);
+      reset();
+      notify.success("API key created — copy it now");
       loadKeys();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
+      notify.error(err instanceof Error ? err.message : "Failed");
     } finally {
       setLoading(false);
     }
   }
 
   async function revokeKey(id: string) {
-    if (!confirm("Revoke this API key?")) return;
+    const confirmed = await confirmDelete(
+      "Revoke API key?",
+      "Applications using this key will stop working immediately."
+    );
+    if (!confirmed) return;
     const res = await fetch(`/api/tenant/api-keys?id=${id}`, {
       method: "DELETE",
     });
     if (res.ok) {
-      toast.success("Key revoked");
+      notify.success("Key revoked");
       loadKeys();
     }
   }
@@ -77,7 +90,7 @@ export function ApiKeysManager({ hasApiAccess }: { hasApiAccess: boolean }) {
   function copyKey() {
     if (newKey) {
       navigator.clipboard.writeText(newKey);
-      toast.success("Copied to clipboard");
+      notify.success("Copied to clipboard");
     }
   }
 
@@ -115,16 +128,23 @@ export function ApiKeysManager({ hasApiAccess }: { hasApiAccess: boolean }) {
         </div>
       )}
 
-      <form onSubmit={createKey} className="flex gap-2 items-end">
-        <div className="flex-1 space-y-2">
-          <Label>Key name</Label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+      <form onSubmit={createKey} className="flex gap-2 items-end" noValidate>
+        <FormField
+          label="Key name"
+          htmlFor="keyName"
+          required
+          error={fieldError("name")}
+          className="flex-1"
+        >
+          <FormInput
+            id="keyName"
+            name="keyName"
+            value={values.name}
+            error={fieldError("name")}
+            onChange={(e) => setField("name", e.target.value)}
             placeholder="e.g. WooCommerce sync"
-            required
           />
-        </div>
+        </FormField>
         <Button type="submit" disabled={loading}>
           <Plus className="h-4 w-4 mr-1" />
           Create key

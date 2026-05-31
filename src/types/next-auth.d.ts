@@ -9,6 +9,8 @@ declare module "next-auth" {
     branchId?: string | null;
     role?: string;
     permissions?: string[];
+    impersonatedBy?: string;
+    impersonatedByName?: string;
   }
 
   interface Session {
@@ -21,6 +23,8 @@ declare module "next-auth" {
       branchId?: string | null;
       role?: string;
       permissions?: string[];
+      impersonatedBy?: string;
+      impersonatedByName?: string;
     };
   }
 }
@@ -34,5 +38,7 @@ declare module "next-auth/jwt" {
     branchId?: string | null;
     role?: string;
     permissions?: string[];
+    impersonatedBy?: string;
+    impersonatedByName?: string;
   }
 }

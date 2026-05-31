@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSession, signIn } from "@/lib/auth-client";
 import { tenantDashboardPath } from "@/lib/tenant-path";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { loginSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import { LoginCard } from "@/components/auth/login-card";
 
 function TenantLoginForm() {
@@ -17,26 +18,35 @@ function TenantLoginForm() {
   const tenantSlug = searchParams.get("tenant") || "";
   const loginError = searchParams.get("error");
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("owner@demoshop.com");
-  const [password, setPassword] = useState("password123");
+
+  const { values, setField, validate, fieldError } = useValidatedForm(
+    {
+      email: "owner@demoshop.com",
+      password: "password123",
+    },
+    loginSchema
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
 
     const check = await fetch(
-      `/api/auth/check?email=${encodeURIComponent(email)}&type=tenant`
+      `/api/auth/check?email=${encodeURIComponent(data.email)}&type=tenant`
     );
     const status = await check.json();
     if (!status.ok && status.message) {
       setLoading(false);
-      toast.error(status.message);
+      notify.error(status.message);
       return;
     }
 
     const result = await signIn("credentials", {
-      email,
-      password,
+      email: data.email,
+      password: data.password,
       loginType: "tenant",
       tenantSlug,
       redirect: false,
@@ -45,11 +55,11 @@ function TenantLoginForm() {
     setLoading(false);
 
     if (result?.error) {
-      toast.error("Invalid email or password");
+      notify.error("Invalid email or password");
       return;
     }
 
-    toast.success("Welcome back!");
+    notify.success("Welcome back!");
     const session = await getSession();
     const slug = session?.user?.tenantSlug || tenantSlug || "demo-shop";
     router.push(tenantDashboardPath(slug));
@@ -92,29 +102,39 @@ function TenantLoginForm() {
           This account does not belong to this business URL.
         </p>
       )}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <FormField
+          label="Email"
+          htmlFor="email"
+          required
+          error={fieldError("email")}
+        >
+          <FormInput
             id="email"
+            name="email"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
+            value={values.email}
+            error={fieldError("email")}
+            onChange={(e) => setField("email", e.target.value)}
             autoComplete="email"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
+        </FormField>
+        <FormField
+          label="Password"
+          htmlFor="password"
+          required
+          error={fieldError("password")}
+        >
+          <FormInput
             id="password"
+            name="password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
+            value={values.password}
+            error={fieldError("password")}
+            onChange={(e) => setField("password", e.target.value)}
             autoComplete="current-password"
           />
-        </div>
+        </FormField>
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Signing in..." : "Sign in to dashboard"}
         </Button>

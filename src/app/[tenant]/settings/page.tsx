@@ -2,9 +2,17 @@ import { auth } from "@/auth";
 import { getTenantWithSubscription } from "@/lib/tenant";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { formatDate, formatCurrency, decimalToNumber } from "@/lib/utils";
+import { tenantDashboardPath } from "@/lib/tenant-path";
+import { Button } from "@/components/ui/button";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  params,
+}: {
+  params: Promise<{ tenant: string }>;
+}) {
+  const { tenant: tenantSlug } = await params;
   const session = await auth();
   const tenant = session?.user?.tenantId
     ? await getTenantWithSubscription(session.user.tenantId)
@@ -79,6 +87,22 @@ export default async function SettingsPage() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Integrations</CardTitle>
+            <CardDescription>WooCommerce and external sync</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              Connect your WooCommerce store to sync products, inventory, and
+              online orders.
+            </p>
+            <Link href={tenantDashboardPath(tenantSlug, "/integrations")}>
+              <Button variant="outline">Open Integrations</Button>
+            </Link>
           </CardContent>
         </Card>
 

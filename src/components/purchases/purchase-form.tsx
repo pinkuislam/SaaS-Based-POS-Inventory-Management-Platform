@@ -2,20 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { purchaseFormSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { usePurchaseStore } from "@/stores/purchase-store";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Search, Plus, Minus, Trash2 } from "lucide-react";
 import { formatCurrency, decimalToNumber } from "@/lib/utils";
 
@@ -31,7 +29,9 @@ export function PurchaseForm() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<ProductResult[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>(
+    []
+  );
   const [loading, setLoading] = useState(false);
 
   const {
@@ -55,6 +55,15 @@ export function PurchaseForm() {
     getTotal,
   } = usePurchaseStore();
 
+  const { values, setField, validate, fieldError } = useValidatedForm(
+    {
+      supplierId: supplierId || "",
+      paidAmount: paidAmount ? String(paidAmount) : "",
+      notes: notes || "",
+    },
+    purchaseFormSchema
+  );
+
   const searchProducts = useCallback(async (q: string) => {
     if (!q.trim()) {
       setProducts([]);
@@ -76,6 +85,14 @@ export function PurchaseForm() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setField("supplierId", supplierId || "");
+  }, [supplierId, setField]);
+
+  useEffect(() => {
+    setField("notes", notes || "");
+  }, [notes, setField]);
+
   function handleAdd(product: ProductResult) {
     addItem({
       productId: product.id,
@@ -87,11 +104,20 @@ export function PurchaseForm() {
     setProducts([]);
   }
 
-  async function handleSubmit() {
+  const supplierOptions = [
+    { value: "", label: "No supplier" },
+    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+  ];
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     if (items.length === 0) {
-      toast.error("Add at least one product");
+      notify.error("Add at least one product");
       return;
     }
+
+    const data = validate();
+    if (!data) return;
 
     const subtotal = getSubtotal();
     const total = getTotal();
@@ -115,23 +141,25 @@ export function PurchaseForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: purchaseItems,
-          supplierId,
+          supplierId: data.supplierId || null,
           subtotal,
           discount,
           tax,
           total,
-          paidAmount: paidAmount || total,
-          notes,
+          paidAmount: data.paidAmount
+            ? parseFloat(data.paidAmount)
+            : paidAmount || total,
+          notes: data.notes,
         }),
       });
       if (!res.ok) throw new Error();
       const purchase = await res.json();
-      toast.success(`Purchase saved: ${purchase.invoiceNo}`);
+      notify.success(`Purchase saved: ${purchase.invoiceNo}`);
       clear();
       router.push("/dashboard/purchases");
       router.refresh();
     } catch {
-      toast.error("Failed to save purchase");
+      notify.error("Failed to save purchase");
     } finally {
       setLoading(false);
     }
@@ -140,13 +168,13 @@ export function PurchaseForm() {
   const total = getTotal();
 
   return (
-    <div className="grid lg:grid-cols-3 gap-4">
+    <form onSubmit={handleSubmit} className="grid lg:grid-cols-3 gap-4" noValidate>
       <div className="lg:col-span-2 space-y-4">
         <Card>
           <CardContent className="pt-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
+              <FormInput
                 placeholder="Search products to add..."
                 className="pl-10"
                 value={search}
@@ -175,7 +203,9 @@ export function PurchaseForm() {
 
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-base">Purchase Items ({items.length})</CardTitle>
+            <CardTitle className="text-base">
+              Purchase Items ({items.length})
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {items.length === 0 ? (
@@ -185,10 +215,13 @@ export function PurchaseForm() {
             ) : (
               <div className="divide-y">
                 {items.map((item) => (
-                  <div key={item.productId} className="flex flex-wrap items-center gap-2 p-4">
+                  <div
+                    key={item.productId}
+                    className="flex flex-wrap items-center gap-2 p-4"
+                  >
                     <div className="flex-1 min-w-[120px]">
                       <p className="font-medium">{item.name}</p>
-                      <Input
+                      <FormInput
                         type="number"
                         className="h-8 w-24 mt-1"
                         value={item.unitPrice}
@@ -199,10 +232,13 @@ export function PurchaseForm() {
                           )
                         }
                       />
-                      <span className="text-xs text-muted-foreground ml-1">/ unit</span>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        / unit
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
+                        type="button"
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
@@ -214,6 +250,7 @@ export function PurchaseForm() {
                       </Button>
                       <span className="w-8 text-center">{item.quantity}</span>
                       <Button
+                        type="button"
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
@@ -228,6 +265,7 @@ export function PurchaseForm() {
                       {formatCurrency(item.unitPrice * item.quantity)}
                     </span>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="icon"
                       onClick={() => removeItem(item.productId)}
@@ -247,64 +285,76 @@ export function PurchaseForm() {
           <CardTitle>Purchase Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Supplier</Label>
-            <Select
-              value={supplierId || "none"}
-              onValueChange={(v) => {
-                if (v === "none") setSupplier(null, "");
-                else {
-                  const s = suppliers.find((s) => s.id === v);
-                  setSupplier(v, s?.name || "");
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No supplier</SelectItem>
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FormSelect2
+            label="Supplier"
+            htmlFor="supplierId"
+            options={supplierOptions}
+            value={values.supplierId}
+            onChange={(v) => {
+              setField("supplierId", v);
+              if (v === "") setSupplier(null, "");
+              else {
+                const s = suppliers.find((s) => s.id === v);
+                setSupplier(v, s?.name || "");
+              }
+            }}
+            placeholder="Select supplier"
+            error={fieldError("supplierId")}
+          />
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <Label>Discount</Label>
-              <Input
+            <FormField label="Discount">
+              <FormInput
                 type="number"
                 value={discount || ""}
-                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                onChange={(e) =>
+                  setDiscount(parseFloat(e.target.value) || 0)
+                }
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Tax</Label>
-              <Input
+            </FormField>
+            <FormField label="Tax">
+              <FormInput
                 type="number"
                 value={tax || ""}
                 onChange={(e) => setTax(parseFloat(e.target.value) || 0)}
               />
-            </div>
+            </FormField>
           </div>
 
-          <div className="space-y-2">
-            <Label>Paid Amount</Label>
-            <Input
+          <FormField
+            label="Paid Amount"
+            htmlFor="paidAmount"
+            error={fieldError("paidAmount")}
+          >
+            <FormInput
+              id="paidAmount"
+              name="paidAmount"
               type="number"
-              value={paidAmount || total || ""}
-              onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+              value={values.paidAmount || total || ""}
+              error={fieldError("paidAmount")}
+              onChange={(e) => {
+                setField("paidAmount", e.target.value);
+                setPaidAmount(parseFloat(e.target.value) || 0);
+              }}
             />
-          </div>
+          </FormField>
 
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+          <FormField
+            label="Notes"
+            htmlFor="notes"
+            error={fieldError("notes")}
+          >
+            <FormInput
+              id="notes"
+              name="notes"
+              value={values.notes}
+              error={fieldError("notes")}
+              onChange={(e) => {
+                setField("notes", e.target.value);
+                setNotes(e.target.value);
+              }}
+            />
+          </FormField>
 
           <Separator />
 
@@ -319,19 +369,21 @@ export function PurchaseForm() {
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Due</span>
-              <span>{formatCurrency(Math.max(0, total - (paidAmount || total)))}</span>
+              <span>
+                {formatCurrency(Math.max(0, total - (paidAmount || total)))}
+              </span>
             </div>
           </div>
 
           <Button
+            type="submit"
             className="w-full"
-            onClick={handleSubmit}
             disabled={loading || items.length === 0}
           >
             {loading ? "Saving..." : "Save Purchase"}
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </form>
   );
 }

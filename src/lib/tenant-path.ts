@@ -4,6 +4,7 @@ const RESERVED_SEGMENTS = new Set([
   "login",
   "register",
   "api",
+  "maintenance",
   "forgot-password",
   "reset-password",
   "_next",

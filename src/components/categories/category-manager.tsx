@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { categoryItemSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -34,13 +35,18 @@ export function CategoryManager({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("");
-  const [shortName, setShortName] = useState("");
   const [activeTab, setActiveTab] = useState("category");
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    { name: "", shortName: "" },
+    categoryItemSchema
+  );
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/categories", {
@@ -48,17 +54,16 @@ export function CategoryManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: activeTab,
-          name: name.trim(),
-          shortName: shortName.trim() || undefined,
+          name: data.name.trim(),
+          shortName: data.shortName?.trim() || undefined,
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Added successfully");
-      setName("");
-      setShortName("");
+      notify.success("Added successfully");
+      reset();
       router.refresh();
     } catch {
-      toast.error("Failed to add");
+      notify.error("Failed to add");
     } finally {
       setLoading(false);
     }
@@ -91,8 +96,7 @@ export function CategoryManager({
       onValueChange={(v) => {
         if (v) {
           setActiveTab(v);
-          setName("");
-          setShortName("");
+          reset();
         }
       }}
     >
@@ -115,25 +119,43 @@ export function CategoryManager({
                 <CardTitle className="text-base">Add {label}</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleAdd} className="flex flex-wrap gap-3">
-                  <div className="space-y-2 flex-1 min-w-[200px]">
-                    <Label>Name</Label>
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                <form
+                  onSubmit={handleAdd}
+                  className="flex flex-wrap gap-3"
+                  noValidate
+                >
+                  <FormField
+                    label="Name"
+                    htmlFor="itemName"
+                    required
+                    error={fieldError("name")}
+                    className="flex-1 min-w-[200px]"
+                  >
+                    <FormInput
+                      id="itemName"
+                      name="itemName"
+                      value={values.name}
+                      error={fieldError("name")}
+                      onChange={(e) => setField("name", e.target.value)}
                       placeholder={`${label} name`}
-                      required
                     />
-                  </div>
+                  </FormField>
                   {tab === "unit" && (
-                    <div className="space-y-2 w-32">
-                      <Label>Short</Label>
-                      <Input
-                        value={shortName}
-                        onChange={(e) => setShortName(e.target.value)}
+                    <FormField
+                      label="Short"
+                      htmlFor="shortName"
+                      error={fieldError("shortName")}
+                      className="w-32"
+                    >
+                      <FormInput
+                        id="shortName"
+                        name="shortName"
+                        value={values.shortName}
+                        error={fieldError("shortName")}
+                        onChange={(e) => setField("shortName", e.target.value)}
                         placeholder="pc"
                       />
-                    </div>
+                    </FormField>
                   )}
                   <div className="flex items-end">
                     <Button type="submit" disabled={loading}>
@@ -149,9 +171,7 @@ export function CategoryManager({
                   {label} List ({items.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {renderTable(items, tab === "unit")}
-              </CardContent>
+              <CardContent>{renderTable(items, tab === "unit")}</CardContent>
             </Card>
           </TabsContent>
         );

@@ -1,44 +1,63 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { useValidatedForm } from "@/hooks/use-validated-form";
+import { paymentSettingsSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+const STRIPE_WEBHOOK_PATH = "/api/webhooks/stripe";
+
+const GATEWAY_OPTIONS = [
+  { value: "stripe", label: "Stripe" },
+  { value: "sslcommerz", label: "SSLCommerz" },
+];
+
+const initial = {
+  stripeEnabled: false,
+  stripePublishableKey: "",
+  stripeSecretKey: "",
+  stripeWebhookSecret: "",
+  sslcommerzEnabled: false,
+  sslcommerzStoreId: "",
+  sslcommerzStorePass: "",
+  sslcommerzSandbox: true,
+  defaultGateway: "stripe",
+};
 
 export function PaymentSettingsForm() {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    stripeEnabled: false,
-    stripePublishableKey: "",
-    stripeSecretKey: "",
-    stripeWebhookSecret: "",
-    sslcommerzEnabled: false,
-    sslcommerzStoreId: "",
-    sslcommerzStorePass: "",
-    sslcommerzSandbox: true,
-    defaultGateway: "stripe",
-  });
+  const [webhookUrl, setWebhookUrl] = useState(
+    `Webhook URL: ${STRIPE_WEBHOOK_PATH}`
+  );
+  const { values: form, setField, validate, fieldError: fe, setValues } =
+    useValidatedForm(initial, paymentSettingsSchema);
+
+  useEffect(() => {
+    setWebhookUrl(`Webhook URL: ${window.location.origin}${STRIPE_WEBHOOK_PATH}`);
+  }, []);
 
   useEffect(() => {
     fetch("/api/admin/payment-settings")
       .then((r) => r.json())
       .then((data) => {
         if (data.error) return;
-        setForm({
+        setValues({
           stripeEnabled: data.stripeEnabled,
           stripePublishableKey: data.stripePublishableKey || "",
           stripeSecretKey: "",
-          stripeWebhookSecret: data.stripeWebhookSecret === "••••••••" ? "" : data.stripeWebhookSecret || "",
+          stripeWebhookSecret:
+            data.stripeWebhookSecret === "••••••••"
+              ? ""
+              : data.stripeWebhookSecret || "",
           sslcommerzEnabled: data.sslcommerzEnabled,
           sslcommerzStoreId: data.sslcommerzStoreId || "",
           sslcommerzStorePass: "",
@@ -46,28 +65,31 @@ export function PaymentSettingsForm() {
           defaultGateway: data.defaultGateway || "stripe",
         });
       });
-  }, []);
+  }, [setValues]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/admin/payment-settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error();
-      toast.success("Payment settings saved");
+      notify.success("Payment settings saved");
     } catch {
-      toast.error("Save failed");
+      notify.error("Save failed");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <form onSubmit={handleSave} className="space-y-6" noValidate>
       <Card>
         <CardHeader>
           <CardTitle>Stripe</CardTitle>
@@ -77,47 +99,52 @@ export function PaymentSettingsForm() {
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={form.stripeEnabled}
-              onCheckedChange={(c) =>
-                setForm({ ...form, stripeEnabled: c === true })
-              }
+              onCheckedChange={(c) => setField("stripeEnabled", c === true)}
             />
             Enable Stripe
           </label>
-          <div className="space-y-2">
-            <Label>Publishable Key</Label>
-            <Input
+          <FormField
+            label="Publishable Key"
+            htmlFor="stripePublishableKey"
+            error={fe("stripePublishableKey")}
+          >
+            <FormInput
+              id="stripePublishableKey"
               value={form.stripePublishableKey}
-              onChange={(e) =>
-                setForm({ ...form, stripePublishableKey: e.target.value })
-              }
+              error={fe("stripePublishableKey")}
+              onChange={(e) => setField("stripePublishableKey", e.target.value)}
               placeholder="pk_test_..."
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Secret Key</Label>
-            <Input
+          </FormField>
+          <FormField
+            label="Secret Key"
+            htmlFor="stripeSecretKey"
+            error={fe("stripeSecretKey")}
+          >
+            <FormInput
+              id="stripeSecretKey"
               type="password"
               value={form.stripeSecretKey}
-              onChange={(e) =>
-                setForm({ ...form, stripeSecretKey: e.target.value })
-              }
+              error={fe("stripeSecretKey")}
+              onChange={(e) => setField("stripeSecretKey", e.target.value)}
               placeholder="sk_test_... (leave blank to keep)"
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Webhook Secret</Label>
-            <Input
+          </FormField>
+          <FormField
+            label="Webhook Secret"
+            htmlFor="stripeWebhookSecret"
+            error={fe("stripeWebhookSecret")}
+            description={webhookUrl}
+          >
+            <FormInput
+              id="stripeWebhookSecret"
               type="password"
               value={form.stripeWebhookSecret}
-              onChange={(e) =>
-                setForm({ ...form, stripeWebhookSecret: e.target.value })
-              }
+              error={fe("stripeWebhookSecret")}
+              onChange={(e) => setField("stripeWebhookSecret", e.target.value)}
               placeholder="whsec_..."
             />
-            <p className="text-xs text-muted-foreground">
-              Webhook URL: {typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/stripe
-            </p>
-          </div>
+          </FormField>
         </CardContent>
       </Card>
 
@@ -130,61 +157,59 @@ export function PaymentSettingsForm() {
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={form.sslcommerzEnabled}
-              onCheckedChange={(c) =>
-                setForm({ ...form, sslcommerzEnabled: c === true })
-              }
+              onCheckedChange={(c) => setField("sslcommerzEnabled", c === true)}
             />
             Enable SSLCommerz
           </label>
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Store ID</Label>
-              <Input
+            <FormField
+              label="Store ID"
+              htmlFor="sslcommerzStoreId"
+              error={fe("sslcommerzStoreId")}
+            >
+              <FormInput
+                id="sslcommerzStoreId"
                 value={form.sslcommerzStoreId}
-                onChange={(e) =>
-                  setForm({ ...form, sslcommerzStoreId: e.target.value })
-                }
+                error={fe("sslcommerzStoreId")}
+                onChange={(e) => setField("sslcommerzStoreId", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Store Password</Label>
-              <Input
+            </FormField>
+            <FormField
+              label="Store Password"
+              htmlFor="sslcommerzStorePass"
+              error={fe("sslcommerzStorePass")}
+            >
+              <FormInput
+                id="sslcommerzStorePass"
                 type="password"
                 value={form.sslcommerzStorePass}
-                onChange={(e) =>
-                  setForm({ ...form, sslcommerzStorePass: e.target.value })
-                }
+                error={fe("sslcommerzStorePass")}
+                onChange={(e) => setField("sslcommerzStorePass", e.target.value)}
                 placeholder="Leave blank to keep"
               />
-            </div>
+            </FormField>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={form.sslcommerzSandbox}
-              onCheckedChange={(c) =>
-                setForm({ ...form, sslcommerzSandbox: c === true })
-              }
+              onCheckedChange={(c) => setField("sslcommerzSandbox", c === true)}
             />
             Sandbox mode
           </label>
         </CardContent>
       </Card>
 
-      <div className="space-y-2 max-w-xs">
-        <Label>Default gateway</Label>
-        <Select
-          value={form.defaultGateway}
-          onValueChange={(v) => v && setForm({ ...form, defaultGateway: v })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="stripe">Stripe</SelectItem>
-            <SelectItem value="sslcommerz">SSLCommerz</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FormSelect2
+        label="Default gateway"
+        htmlFor="defaultGateway"
+        required
+        error={fe("defaultGateway")}
+        options={GATEWAY_OPTIONS}
+        value={form.defaultGateway}
+        onChange={(v) => setField("defaultGateway", v)}
+        searchable={false}
+        className="max-w-xs"
+      />
 
       <Button type="submit" disabled={loading}>
         {loading ? "Saving..." : "Save Payment Settings"}

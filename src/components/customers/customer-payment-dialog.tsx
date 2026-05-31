@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { customerPaymentSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -13,16 +18,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Banknote } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { SerializedDueSale } from "@/lib/serialize";
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "mobile", label: "Mobile Banking" },
+  { value: "bank", label: "Bank Transfer" },
+];
 
 export function CustomerPaymentDialog({
   customerId,
@@ -38,20 +43,31 @@ export function CustomerPaymentDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState("cash");
-  const [saleId, setSaleId] = useState("all");
-  const [notes, setNotes] = useState("");
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    {
+      amount: "",
+      note: "",
+      method: "cash",
+      saleId: "all",
+    },
+    customerPaymentSchema
+  );
 
   if (totalDue <= 0) return null;
 
+  const saleOptions = [
+    { value: "all", label: "All invoices (oldest first)" },
+    ...dueSales.map((s) => ({
+      value: s.id,
+      label: `${s.invoiceNo} — due ${formatCurrency(s.dueAmount)}`,
+    })),
+  ];
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payAmount = parseFloat(amount);
-    if (!payAmount || payAmount <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
+    const data = validate();
+    if (!data) return;
 
     setLoading(true);
     try {
@@ -59,22 +75,22 @@ export function CustomerPaymentDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: payAmount,
-          method,
-          saleId: saleId === "all" ? null : saleId,
-          notes,
+          amount: parseFloat(data.amount),
+          method: data.method,
+          saleId: data.saleId === "all" ? null : data.saleId,
+          notes: data.note,
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error);
+        const resData = await res.json();
+        throw new Error(resData.error);
       }
-      toast.success("Payment recorded");
+      notify.success("Payment recorded");
       setOpen(false);
-      setAmount("");
+      reset({ amount: "", note: "", method: "cash", saleId: "all" });
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Payment failed");
+      notify.error(e instanceof Error ? e.message : "Payment failed");
     } finally {
       setLoading(false);
     }
@@ -82,7 +98,7 @@ export function CustomerPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-1 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 px-2.5 text-sm font-medium">
+      <DialogTrigger render={<Button />}>
         <Banknote className="h-4 w-4" />
         Collect
       </DialogTrigger>
@@ -93,56 +109,53 @@ export function CustomerPaymentDialog({
         <p className="text-sm text-muted-foreground">
           Total due: {formatCurrency(totalDue)}
         </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Apply to invoice</Label>
-            <Select value={saleId} onValueChange={(v) => v && setSaleId(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All invoices (oldest first)</SelectItem>
-                {dueSales.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.invoiceNo} — due{" "}
-                    {formatCurrency(s.dueAmount)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormSelect2
+            label="Apply to invoice"
+            htmlFor="saleId"
+            options={saleOptions}
+            value={values.saleId}
+            onChange={(v) => setField("saleId", v)}
+            error={fieldError("saleId")}
+          />
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Amount *</Label>
-              <Input
+            <FormField
+              label="Amount"
+              htmlFor="amount"
+              required
+              error={fieldError("amount")}
+            >
+              <FormInput
+                id="amount"
+                name="amount"
                 type="number"
                 step="0.01"
                 min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                value={values.amount}
+                error={fieldError("amount")}
+                onChange={(e) => setField("amount", e.target.value)}
                 placeholder={String(totalDue)}
-                required
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Method</Label>
-              <Select value={method} onValueChange={(v) => v && setMethod(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="mobile">Mobile Banking</SelectItem>
-                  <SelectItem value="bank">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            </FormField>
+            <FormSelect2
+              label="Method"
+              htmlFor="method"
+              required
+              options={PAYMENT_METHOD_OPTIONS}
+              value={values.method}
+              onChange={(v) => setField("method", v)}
+              error={fieldError("method")}
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+          <FormField label="Notes" htmlFor="note" error={fieldError("note")}>
+            <FormInput
+              id="note"
+              name="note"
+              value={values.note}
+              error={fieldError("note")}
+              onChange={(e) => setField("note", e.target.value)}
+            />
+          </FormField>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Record Payment"}
           </Button>

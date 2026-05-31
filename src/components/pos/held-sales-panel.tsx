@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, decimalToNumber, formatDate } from "@/lib/utils";
@@ -39,11 +39,11 @@ export function HeldSalesPanel({ onResume }: { onResume?: () => void }) {
       });
       if (!res.ok) throw new Error();
       const sale = await res.json();
-      toast.success(`Sale completed: ${sale.invoiceNo}`);
+      notify.success(`Sale completed: ${sale.invoiceNo}`);
       await loadHeld();
       onResume?.();
     } catch {
-      toast.error("Failed to complete held sale");
+      notify.error("Failed to complete held sale");
     } finally {
       setLoading(false);
     }

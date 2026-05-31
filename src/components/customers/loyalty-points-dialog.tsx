@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { loyaltySchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -27,30 +28,41 @@ export function LoyaltyPointsDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [redeemPoints, setRedeemPoints] = useState("");
-  const [adjustPoints, setAdjustPoints] = useState(String(currentPoints));
+
+  const redeemForm = useValidatedForm({ points: "", note: "" }, loyaltySchema);
+  const adjustForm = useValidatedForm(
+    { points: String(currentPoints), note: "" },
+    loyaltySchema
+  );
 
   async function handleRedeem(e: React.FormEvent) {
     e.preventDefault();
+    const data = redeemForm.validate();
+    if (!data) return;
+
+    const pts = parseInt(data.points, 10);
+    if (pts > currentPoints) {
+      notify.error(`Maximum ${currentPoints} points available`);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(`/api/customers/${customerId}/loyalty`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "redeem",
-          points: parseInt(redeemPoints, 10),
-        }),
+        body: JSON.stringify({ action: "redeem", points: pts }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success(
-        `Redeemed ${data.pointsRedeemed} points (৳${data.discountValue} discount value)`
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success(
+        `Redeemed ${resData.pointsRedeemed} points (৳${resData.discountValue} discount value)`
       );
       setOpen(false);
+      redeemForm.reset();
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
+      notify.error(err instanceof Error ? err.message : "Failed");
     } finally {
       setLoading(false);
     }
@@ -58,6 +70,9 @@ export function LoyaltyPointsDialog({
 
   async function handleAdjust(e: React.FormEvent) {
     e.preventDefault();
+    const data = adjustForm.validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch(`/api/customers/${customerId}/loyalty`, {
@@ -65,15 +80,15 @@ export function LoyaltyPointsDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "adjust",
-          points: parseInt(adjustPoints, 10),
+          points: parseInt(data.points, 10),
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Points updated");
+      notify.success("Points updated");
       setOpen(false);
       router.refresh();
     } catch {
-      toast.error("Failed");
+      notify.error("Failed");
     } finally {
       setLoading(false);
     }
@@ -81,7 +96,7 @@ export function LoyaltyPointsDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-2 rounded-lg border px-3 h-8 text-sm hover:bg-muted">
+      <DialogTrigger render={<Button variant="outline" />}>
         <Gift className="h-4 w-4" />
         Loyalty ({currentPoints} pts)
       </DialogTrigger>
@@ -90,35 +105,57 @@ export function LoyaltyPointsDialog({
           <DialogTitle>Loyalty — {customerName}</DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
-          <form onSubmit={handleRedeem} className="space-y-3">
-            <Label>Redeem points</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min="1"
-                max={currentPoints}
-                value={redeemPoints}
-                onChange={(e) => setRedeemPoints(e.target.value)}
-                placeholder={`Max ${currentPoints}`}
-              />
-              <Button type="submit" disabled={loading || currentPoints === 0}>
-                Redeem
-              </Button>
-            </div>
+          <form onSubmit={handleRedeem} className="space-y-3" noValidate>
+            <FormField
+              label="Redeem points"
+              htmlFor="redeemPoints"
+              error={redeemForm.fieldError("points")}
+            >
+              <div className="flex gap-2">
+                <FormInput
+                  id="redeemPoints"
+                  name="redeemPoints"
+                  type="number"
+                  min="1"
+                  max={currentPoints}
+                  value={redeemForm.values.points}
+                  error={redeemForm.fieldError("points")}
+                  onChange={(e) => redeemForm.setField("points", e.target.value)}
+                  placeholder={`Max ${currentPoints}`}
+                />
+                <Button type="submit" disabled={loading || currentPoints === 0}>
+                  Redeem
+                </Button>
+              </div>
+            </FormField>
           </form>
-          <form onSubmit={handleAdjust} className="space-y-3 border-t pt-4">
-            <Label>Manual adjust balance</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min="0"
-                value={adjustPoints}
-                onChange={(e) => setAdjustPoints(e.target.value)}
-              />
-              <Button type="submit" variant="outline" disabled={loading}>
-                Set
-              </Button>
-            </div>
+          <form
+            onSubmit={handleAdjust}
+            className="space-y-3 border-t pt-4"
+            noValidate
+          >
+            <FormField
+              label="Manual adjust balance"
+              htmlFor="adjustPoints"
+              error={adjustForm.fieldError("points")}
+            >
+              <div className="flex gap-2">
+                <FormInput
+                  id="adjustPoints"
+                  name="adjustPoints"
+                  type="number"
+                  min="0"
+                  value={adjustForm.values.points}
+                  error={adjustForm.fieldError("points")}
+                  onChange={(e) =>
+                    adjustForm.setField("points", e.target.value)
+                  }
+                />
+                <Button type="submit" variant="outline" disabled={loading}>
+                  Set
+                </Button>
+              </div>
+            </FormField>
           </form>
         </div>
       </DialogContent>

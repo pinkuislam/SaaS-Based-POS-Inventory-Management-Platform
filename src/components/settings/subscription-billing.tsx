@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Smartphone } from "lucide-react";
@@ -46,18 +46,18 @@ function BillingInner({
         .then((r) => r.json())
         .then((data) => {
           if (data.success) {
-            toast.success("Subscription payment successful!");
+            notify.success("Subscription payment successful!");
             window.location.href = "/dashboard/settings/billing";
           } else {
-            toast.error(data.error || "Payment verification failed");
+            notify.error(data.error || "Payment verification failed");
           }
         });
     }
     if (searchParams.get("failed") === "1") {
-      toast.error("Payment failed");
+      notify.error("Payment failed");
     }
     if (searchParams.get("cancelled") === "1") {
-      toast.info("Payment cancelled");
+      notify.info("Payment cancelled");
     }
   }, [searchParams]);
 
@@ -73,7 +73,7 @@ function BillingInner({
       if (!res.ok) throw new Error(data.error);
       if (data.url) window.location.href = data.url;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Checkout failed");
+      notify.error(e instanceof Error ? e.message : "Checkout failed");
     } finally {
       setLoading(false);
     }

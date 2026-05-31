@@ -21,6 +21,8 @@ export const authConfig = {
         token.branchId = user.branchId;
         token.role = user.role;
         token.permissions = user.permissions;
+        token.impersonatedBy = user.impersonatedBy;
+        token.impersonatedByName = user.impersonatedByName;
       }
       return token;
     },
@@ -34,6 +36,10 @@ export const authConfig = {
         session.user.branchId = token.branchId as string | null;
         session.user.role = token.role as string;
         session.user.permissions = token.permissions as string[];
+        session.user.impersonatedBy = token.impersonatedBy as string | undefined;
+        session.user.impersonatedByName = token.impersonatedByName as
+          | string
+          | undefined;
       }
       return session;
     },

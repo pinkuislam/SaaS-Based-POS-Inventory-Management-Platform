@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { woocommerceSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { RefreshCw, Plug, Package, ShoppingCart } from "lucide-react";
 import { formatDate, decimalToNumber, formatCurrency } from "@/lib/utils";
 
@@ -36,23 +43,28 @@ export function WooCommerceConnect() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState<SavedConfig | null>(null);
   const [orders, setOrders] = useState<OnlineOrderRow[]>([]);
-  const [form, setForm] = useState({
-    storeUrl: "",
-    consumerKey: "",
-    consumerSecret: "",
-    isActive: true,
-    syncProducts: true,
-    syncStock: true,
-    syncOrders: true,
-  });
+
+  const { values, setField, validate, fieldError, setValues } =
+    useValidatedForm(
+      {
+        storeUrl: "",
+        consumerKey: "",
+        consumerSecret: "",
+        isActive: true,
+        syncProducts: true,
+        syncStock: true,
+        syncOrders: true,
+      },
+      woocommerceSchema
+    );
 
   async function loadConfig() {
     const res = await fetch("/api/integrations");
     const data = await res.json();
     if (data && data.storeUrl) {
       setSaved(data);
-      setForm((f) => ({
-        ...f,
+      setValues((prev) => ({
+        ...prev,
         storeUrl: data.storeUrl,
         isActive: data.isActive,
         syncProducts: data.syncProducts,
@@ -74,19 +86,31 @@ export function WooCommerceConnect() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
+    if (!saved?.hasCredentials && !data.consumerKey) {
+      notify.error("Consumer key is required");
+      return;
+    }
+    if (!saved?.hasCredentials && !data.consumerSecret) {
+      notify.error("Consumer secret is required");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/integrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success("WooCommerce settings saved");
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success("WooCommerce settings saved");
       await loadConfig();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Save failed");
+      notify.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setLoading(false);
     }
@@ -98,13 +122,13 @@ export function WooCommerceConnect() {
       const res = await fetch("/api/integrations/woocommerce/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
-      if (data.ok) toast.success(data.message);
-      else toast.error(data.message);
+      if (data.ok) notify.success(data.message);
+      else notify.error(data.message);
     } catch {
-      toast.error("Connection test failed");
+      notify.error("Connection test failed");
     } finally {
       setLoading(false);
     }
@@ -118,10 +142,10 @@ export function WooCommerceConnect() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success(`Products: ${data.created} created, ${data.updated} updated`);
+      notify.success(`Products: ${data.created} created, ${data.updated} updated`);
       await loadConfig();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Sync failed");
+      notify.error(e instanceof Error ? e.message : "Sync failed");
     } finally {
       setLoading(false);
     }
@@ -135,11 +159,11 @@ export function WooCommerceConnect() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success(`Orders: ${data.imported} imported, ${data.skipped} skipped`);
+      notify.success(`Orders: ${data.imported} imported, ${data.skipped} skipped`);
       await loadConfig();
       await loadOrders();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Sync failed");
+      notify.error(e instanceof Error ? e.message : "Sync failed");
     } finally {
       setLoading(false);
     }
@@ -156,8 +180,8 @@ export function WooCommerceConnect() {
                 WooCommerce
               </CardTitle>
               <CardDescription>
-                Connect your store URL and REST API keys (WooCommerce → Settings →
-                Advanced → REST API)
+                Connect your store URL and REST API keys (WooCommerce → Settings
+                → Advanced → REST API)
               </CardDescription>
             </div>
             {saved?.isActive ? (
@@ -168,50 +192,70 @@ export function WooCommerceConnect() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSave} className="space-y-4 max-w-xl">
-            <div className="space-y-2">
-              <Label>Store URL *</Label>
-              <Input
+          <form onSubmit={handleSave} className="space-y-4 max-w-xl" noValidate>
+            <FormField
+              label="Store URL"
+              htmlFor="storeUrl"
+              required
+              error={fieldError("storeUrl")}
+            >
+              <FormInput
+                id="storeUrl"
+                name="storeUrl"
                 placeholder="https://yourstore.com"
-                value={form.storeUrl}
-                onChange={(e) => setForm({ ...form, storeUrl: e.target.value })}
-                required
+                value={values.storeUrl}
+                error={fieldError("storeUrl")}
+                onChange={(e) => setField("storeUrl", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Consumer Key *</Label>
-              <Input
-                value={form.consumerKey}
-                onChange={(e) => setForm({ ...form, consumerKey: e.target.value })}
-                required={!saved?.hasCredentials}
-                placeholder={saved?.hasCredentials ? "Leave blank to keep existing" : ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Consumer Secret *</Label>
-              <Input
-                type="password"
-                value={form.consumerSecret}
-                onChange={(e) =>
-                  setForm({ ...form, consumerSecret: e.target.value })
+            </FormField>
+            <FormField
+              label="Consumer Key"
+              htmlFor="consumerKey"
+              required={!saved?.hasCredentials}
+              error={fieldError("consumerKey")}
+            >
+              <FormInput
+                id="consumerKey"
+                name="consumerKey"
+                value={values.consumerKey}
+                error={fieldError("consumerKey")}
+                onChange={(e) => setField("consumerKey", e.target.value)}
+                placeholder={
+                  saved?.hasCredentials ? "Leave blank to keep existing" : ""
                 }
-                required={!saved?.hasCredentials}
-                placeholder={saved?.hasCredentials ? "Leave blank to keep existing" : ""}
               />
-            </div>
+            </FormField>
+            <FormField
+              label="Consumer Secret"
+              htmlFor="consumerSecret"
+              required={!saved?.hasCredentials}
+              error={fieldError("consumerSecret")}
+            >
+              <FormInput
+                id="consumerSecret"
+                name="consumerSecret"
+                type="password"
+                value={values.consumerSecret}
+                error={fieldError("consumerSecret")}
+                onChange={(e) => setField("consumerSecret", e.target.value)}
+                placeholder={
+                  saved?.hasCredentials ? "Leave blank to keep existing" : ""
+                }
+              />
+            </FormField>
             <div className="flex flex-wrap gap-4">
-              {[
-                ["isActive", "Enable integration"],
-                ["syncProducts", "Sync products"],
-                ["syncStock", "Update stock from WooCommerce"],
-                ["syncOrders", "Import online orders as sales"],
-              ].map(([key, label]) => (
+              {(
+                [
+                  ["isActive", "Enable integration"],
+                  ["syncProducts", "Sync products"],
+                  ["syncStock", "Update stock from WooCommerce"],
+                  ["syncOrders", "Import online orders as sales"],
+                ] as const
+              ).map(([key, label]) => (
                 <label key={key} className="flex items-center gap-2 text-sm">
                   <Checkbox
-                    checked={form[key as keyof typeof form] as boolean}
-                    onCheckedChange={(c) =>
-                      setForm({ ...form, [key]: c === true })
-                    }
+                    checked={values[key]}
+                    onCheckedChange={(c) => setField(key, c === true)}
                   />
                   {label}
                 </label>
@@ -274,7 +318,8 @@ export function WooCommerceConnect() {
         <CardContent>
           {orders.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No imported orders yet. Run &quot;Sync Orders&quot; after connecting.
+              No imported orders yet. Run &quot;Sync Orders&quot; after
+              connecting.
             </p>
           ) : (
             <div className="space-y-2">

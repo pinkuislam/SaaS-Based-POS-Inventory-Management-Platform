@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { saleExchangeSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,6 @@ export function SaleExchangeDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [returnQtys, setReturnQtys] = useState<Record<string, string>>({});
-  const [exchangeReason, setExchangeReason] = useState("");
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<
     { id: string; name: string; sellingPrice: unknown; stockQty: unknown }[]
@@ -46,6 +46,11 @@ export function SaleExchangeDialog({
   const [newItems, setNewItems] = useState<
     { productId: string; name: string; quantity: string; unitPrice: string }[]
   >([]);
+
+  const { values, setField } = useValidatedForm(
+    { exchangeReason: "" },
+    saleExchangeSchema
+  );
 
   if (status === "RETURNED" || status === "CANCELLED") return null;
 
@@ -101,7 +106,7 @@ export function SaleExchangeDialog({
       .filter((i) => i.quantity > 0);
 
     if (returnItems.length === 0 && exchangeNewItems.length === 0) {
-      toast.error("Return at least one item or add exchange products");
+      notify.error("Return at least one item or add exchange products");
       return;
     }
 
@@ -113,16 +118,16 @@ export function SaleExchangeDialog({
         body: JSON.stringify({
           returnItems,
           newItems: exchangeNewItems,
-          exchangeReason,
+          exchangeReason: values.exchangeReason,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success("Exchange processed");
+      notify.success("Exchange processed");
       setOpen(false);
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Exchange failed");
+      notify.error(err instanceof Error ? err.message : "Exchange failed");
     } finally {
       setLoading(false);
     }
@@ -130,7 +135,7 @@ export function SaleExchangeDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-1 rounded-lg border px-3 h-8 text-sm hover:bg-muted">
+      <DialogTrigger render={<Button variant="outline" />}>
         <ArrowLeftRight className="h-4 w-4" />
         Exchange
       </DialogTrigger>
@@ -138,18 +143,21 @@ export function SaleExchangeDialog({
         <DialogHeader>
           <DialogTitle>Exchange — {invoiceNo}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Reason</Label>
-            <Input
-              value={exchangeReason}
-              onChange={(e) => setExchangeReason(e.target.value)}
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField label="Reason" htmlFor="exchangeReason">
+            <FormInput
+              id="exchangeReason"
+              name="exchangeReason"
+              value={values.exchangeReason}
+              onChange={(e) => setField("exchangeReason", e.target.value)}
               placeholder="e.g. Wrong size"
             />
-          </div>
+          </FormField>
 
           <div>
-            <Label className="mb-2 block">Return from invoice</Label>
+            <span className="text-sm font-medium mb-2 block">
+              Return from invoice
+            </span>
             <div className="space-y-2">
               {returnable.map((item) =>
                 item.maxReturn > 0 ? (
@@ -157,7 +165,7 @@ export function SaleExchangeDialog({
                     <span className="flex-1 text-sm truncate">
                       {item.product.name} (max {item.maxReturn})
                     </span>
-                    <Input
+                    <FormInput
                       type="number"
                       min="0"
                       max={item.maxReturn}
@@ -177,9 +185,11 @@ export function SaleExchangeDialog({
           </div>
 
           <div>
-            <Label className="mb-2 block">Add exchange products</Label>
+            <span className="text-sm font-medium mb-2 block">
+              Add exchange products
+            </span>
             <div className="flex gap-2">
-              <Input
+              <FormInput
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search product..."
@@ -209,7 +219,7 @@ export function SaleExchangeDialog({
             {newItems.map((item, idx) => (
               <div key={item.productId} className="flex gap-2 mt-2 items-center">
                 <span className="flex-1 text-sm truncate">{item.name}</span>
-                <Input
+                <FormInput
                   type="number"
                   min="1"
                   className="w-16 h-8"
@@ -220,7 +230,7 @@ export function SaleExchangeDialog({
                     setNewItems(next);
                   }}
                 />
-                <Input
+                <FormInput
                   type="number"
                   step="0.01"
                   className="w-20 h-8"

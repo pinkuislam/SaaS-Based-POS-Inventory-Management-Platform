@@ -1,82 +1,97 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { supportTicketSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  FormField,
+  FormInput,
+  FormTextarea,
+  FormSelect2,
+} from "@/components/ui/form-field";
+
+const PRIORITY_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
 
 export function SupportTicketForm() {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    subject: "",
-    message: "",
-    priority: "medium",
-  });
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    {
+      subject: "",
+      message: "",
+      priority: "medium",
+    },
+    supportTicketSchema
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/support", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success("Support ticket submitted");
-      setForm({ subject: "", message: "", priority: "medium" });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success("Support ticket submitted");
+      reset({ subject: "", message: "", priority: "medium" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to submit");
+      notify.error(e instanceof Error ? e.message : "Failed to submit");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label>Subject *</Label>
-        <Input
-          value={form.subject}
-          onChange={(e) => setForm({ ...form, subject: e.target.value })}
-          required
+    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <FormField
+        label="Subject"
+        htmlFor="subject"
+        required
+        error={fieldError("subject")}
+      >
+        <FormInput
+          id="subject"
+          name="subject"
+          value={values.subject}
+          error={fieldError("subject")}
+          onChange={(e) => setField("subject", e.target.value)}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>Priority</Label>
-        <Select
-          value={form.priority}
-          onValueChange={(v) => v && setForm({ ...form, priority: v })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label>Message *</Label>
-        <Textarea
-          value={form.message}
-          onChange={(e) => setForm({ ...form, message: e.target.value })}
+      </FormField>
+      <FormSelect2
+        label="Priority"
+        htmlFor="priority"
+        options={PRIORITY_OPTIONS}
+        value={values.priority || "medium"}
+        onChange={(v) => setField("priority", v)}
+        error={fieldError("priority")}
+      />
+      <FormField
+        label="Message"
+        htmlFor="message"
+        required
+        error={fieldError("message")}
+      >
+        <FormTextarea
+          id="message"
+          name="message"
+          value={values.message}
+          error={fieldError("message")}
+          onChange={(e) => setField("message", e.target.value)}
           rows={4}
-          required
         />
-      </div>
+      </FormField>
       <Button type="submit" disabled={loading}>
         {loading ? "Submitting..." : "Submit Ticket"}
       </Button>

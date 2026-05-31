@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { confirmAction } from "@/lib/confirm";
 import { Button } from "@/components/ui/button";
 import { Database } from "lucide-react";
 
@@ -19,24 +20,34 @@ export function ProvisionDbButton({
   const [loading, setLoading] = useState(false);
 
   async function handleProvision() {
-    if (
-      !confirm(
-        "Create a separate MySQL database for this tenant and apply schema? Existing shared-DB data is not migrated automatically."
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Provision dedicated database?",
+      text: "A separate MySQL database will be created. Existing shared-DB data is not migrated automatically.",
+      confirmText: "Yes, provision",
+      icon: "warning",
+    });
+    if (!confirmed) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/tenants/${tenantId}/provision-db`, {
         method: "POST",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success(`Database provisioned: ${data.dbName}`);
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Failed to provision database"
+        );
+      }
+      notify.success(
+        data.dbName
+          ? `Database provisioned: ${data.dbName}`
+          : "Database provisioned successfully"
+      );
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Provision failed");
+      notify.error(e instanceof Error ? e.message : "Provision failed");
     } finally {
       setLoading(false);
     }

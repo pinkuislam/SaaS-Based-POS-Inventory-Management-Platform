@@ -30,6 +30,10 @@ export async function PATCH(
       ...(body.features !== undefined && { features: body.features }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
       ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
+      ...(body.yearlyPrice !== undefined && {
+        yearlyPrice: body.yearlyPrice === "" || body.yearlyPrice == null ? null : body.yearlyPrice,
+      }),
+      ...(body.isPopular !== undefined && { isPopular: body.isPopular }),
     },
   });
 
@@ -47,14 +51,33 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const tenantCount = await prisma.tenant.count({ where: { packageId: id } });
+  const [tenantCount, subscriptionCount] = await Promise.all([
+    prisma.tenant.count({ where: { packageId: id } }),
+    prisma.subscription.count({ where: { packageId: id } }),
+  ]);
+
   if (tenantCount > 0) {
     return NextResponse.json(
-      { error: "Cannot delete package with active tenants" },
+      { error: "Cannot delete: tenants are assigned to this package" },
       { status: 400 }
     );
   }
 
-  await prisma.subscriptionPackage.delete({ where: { id } });
-  return NextResponse.json({ success: true });
+  if (subscriptionCount > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete: subscriptions reference this package" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await prisma.subscriptionPackage.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    const { prismaDeleteErrorMessage } = await import("@/lib/admin/delete-tenant");
+    return NextResponse.json(
+      { error: prismaDeleteErrorMessage(e) },
+      { status: 500 }
+    );
+  }
 }

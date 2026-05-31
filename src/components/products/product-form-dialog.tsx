@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { productSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +18,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus } from "lucide-react";
 
 interface Option {
@@ -39,51 +37,66 @@ export function ProductFormDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    sku: "",
-    barcode: "",
-    categoryId: "",
-    brandId: "",
-    unitId: "",
-    purchasePrice: "",
-    sellingPrice: "",
-    wholesalePrice: "",
-    batchNo: "",
-    expiryDate: "",
-    stockQty: "",
-    reorderLevel: "10",
-  });
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    {
+      name: "",
+      sku: "",
+      barcode: "",
+      categoryId: "",
+      brandId: "",
+      unitId: "",
+      purchasePrice: "",
+      sellingPrice: "",
+      wholesalePrice: "",
+      batchNo: "",
+      expiryDate: "",
+      stockQty: "",
+      reorderLevel: "10",
+    },
+    productSchema
+  );
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+  const brandOptions = brands.map((b) => ({ value: b.id, label: b.name }));
+  const unitOptions = units.map((u) => ({ value: u.id, label: u.name }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
-          purchasePrice: parseFloat(form.purchasePrice) || 0,
-          sellingPrice: parseFloat(form.sellingPrice) || 0,
-          wholesalePrice: form.wholesalePrice
-            ? parseFloat(form.wholesalePrice)
+          ...data,
+          purchasePrice: parseFloat(data.purchasePrice || "0") || 0,
+          sellingPrice: parseFloat(data.sellingPrice) || 0,
+          wholesalePrice: data.wholesalePrice
+            ? parseFloat(data.wholesalePrice)
             : null,
-          batchNo: form.batchNo || null,
-          expiryDate: form.expiryDate || null,
-          stockQty: parseFloat(form.stockQty) || 0,
-          reorderLevel: parseFloat(form.reorderLevel) || 0,
-          categoryId: form.categoryId || null,
-          brandId: form.brandId || null,
-          unitId: form.unitId || null,
+          batchNo: data.batchNo || null,
+          expiryDate: data.expiryDate || null,
+          stockQty: parseFloat(data.stockQty || "0") || 0,
+          reorderLevel: parseFloat(data.reorderLevel || "0") || 0,
+          categoryId: data.categoryId || null,
+          brandId: data.brandId || null,
+          unitId: data.unitId || null,
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Product created");
+      notify.success("Product created");
       setOpen(false);
+      reset();
       router.refresh();
     } catch {
-      toast.error("Failed to create product");
+      notify.error("Failed to create product");
     } finally {
       setLoading(false);
     }
@@ -91,7 +104,7 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 px-2.5 text-sm font-medium">
+      <DialogTrigger render={<Button />}>
         <Plus className="h-4 w-4" />
         Add Product
       </DialogTrigger>
@@ -99,161 +112,180 @@ export function ProductFormDialog({
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Product Name *</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField
+            label="Product Name"
+            htmlFor="name"
+            required
+            error={fieldError("name")}
+          >
+            <FormInput
+              id="name"
+              name="name"
+              value={values.name}
+              error={fieldError("name")}
+              onChange={(e) => setField("name", e.target.value)}
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="SKU" htmlFor="sku" error={fieldError("sku")}>
+              <FormInput
+                id="sku"
+                name="sku"
+                value={values.sku}
+                error={fieldError("sku")}
+                onChange={(e) => setField("sku", e.target.value)}
+              />
+            </FormField>
+            <FormField
+              label="Barcode"
+              htmlFor="barcode"
+              error={fieldError("barcode")}
+            >
+              <FormInput
+                id="barcode"
+                name="barcode"
+                value={values.barcode}
+                error={fieldError("barcode")}
+                onChange={(e) => setField("barcode", e.target.value)}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <FormSelect2
+              label="Category"
+              htmlFor="categoryId"
+              options={categoryOptions}
+              value={values.categoryId}
+              onChange={(v) => setField("categoryId", v)}
+              placeholder="Select"
+              error={fieldError("categoryId")}
+            />
+            <FormSelect2
+              label="Brand"
+              htmlFor="brandId"
+              options={brandOptions}
+              value={values.brandId}
+              onChange={(v) => setField("brandId", v)}
+              placeholder="Select"
+              error={fieldError("brandId")}
+            />
+            <FormSelect2
+              label="Unit"
+              htmlFor="unitId"
+              options={unitOptions}
+              value={values.unitId}
+              onChange={(v) => setField("unitId", v)}
+              placeholder="Select"
+              error={fieldError("unitId")}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>SKU</Label>
-              <Input
-                value={form.sku}
-                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+            <FormField
+              label="Purchase Price"
+              htmlFor="purchasePrice"
+              error={fieldError("purchasePrice")}
+            >
+              <FormInput
+                id="purchasePrice"
+                name="purchasePrice"
+                type="number"
+                step="0.01"
+                value={values.purchasePrice}
+                error={fieldError("purchasePrice")}
+                onChange={(e) => setField("purchasePrice", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Barcode</Label>
-              <Input
-                value={form.barcode}
-                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+            </FormField>
+            <FormField
+              label="Selling Price"
+              htmlFor="sellingPrice"
+              required
+              error={fieldError("sellingPrice")}
+            >
+              <FormInput
+                id="sellingPrice"
+                name="sellingPrice"
+                type="number"
+                step="0.01"
+                value={values.sellingPrice}
+                error={fieldError("sellingPrice")}
+                onChange={(e) => setField("sellingPrice", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select
-                value={form.categoryId}
-                onValueChange={(v) => setForm({ ...form, categoryId: v || "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Brand</Label>
-              <Select
-                value={form.brandId}
-                onValueChange={(v) => setForm({ ...form, brandId: v || "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Unit</Label>
-              <Select
-                value={form.unitId}
-                onValueChange={(v) => setForm({ ...form, unitId: v || "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Purchase Price</Label>
-              <Input
+            <FormField
+              label="Wholesale Price"
+              htmlFor="wholesalePrice"
+              error={fieldError("wholesalePrice")}
+            >
+              <FormInput
+                id="wholesalePrice"
+                name="wholesalePrice"
                 type="number"
                 step="0.01"
-                value={form.purchasePrice}
-                onChange={(e) =>
-                  setForm({ ...form, purchasePrice: e.target.value })
-                }
+                value={values.wholesalePrice}
+                error={fieldError("wholesalePrice")}
+                onChange={(e) => setField("wholesalePrice", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Selling Price *</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.sellingPrice}
-                onChange={(e) =>
-                  setForm({ ...form, sellingPrice: e.target.value })
-                }
-                required
+            </FormField>
+            <FormField
+              label="Batch No"
+              htmlFor="batchNo"
+              error={fieldError("batchNo")}
+            >
+              <FormInput
+                id="batchNo"
+                name="batchNo"
+                value={values.batchNo}
+                error={fieldError("batchNo")}
+                onChange={(e) => setField("batchNo", e.target.value)}
               />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Wholesale Price</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.wholesalePrice}
-                onChange={(e) =>
-                  setForm({ ...form, wholesalePrice: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Batch No</Label>
-              <Input
-                value={form.batchNo}
-                onChange={(e) => setForm({ ...form, batchNo: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Expiry Date</Label>
-              <Input
+            </FormField>
+            <FormField
+              label="Expiry Date"
+              htmlFor="expiryDate"
+              error={fieldError("expiryDate")}
+            >
+              <FormInput
+                id="expiryDate"
+                name="expiryDate"
                 type="date"
-                value={form.expiryDate}
-                onChange={(e) =>
-                  setForm({ ...form, expiryDate: e.target.value })
-                }
+                value={values.expiryDate}
+                error={fieldError("expiryDate")}
+                onChange={(e) => setField("expiryDate", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Opening Stock</Label>
-              <Input
+            <FormField
+              label="Opening Stock"
+              htmlFor="stockQty"
+              error={fieldError("stockQty")}
+            >
+              <FormInput
+                id="stockQty"
+                name="stockQty"
                 type="number"
-                value={form.stockQty}
-                onChange={(e) => setForm({ ...form, stockQty: e.target.value })}
+                value={values.stockQty}
+                error={fieldError("stockQty")}
+                onChange={(e) => setField("stockQty", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Reorder Level</Label>
-              <Input
+            </FormField>
+            <FormField
+              label="Reorder Level"
+              htmlFor="reorderLevel"
+              error={fieldError("reorderLevel")}
+            >
+              <FormInput
+                id="reorderLevel"
+                name="reorderLevel"
                 type="number"
-                value={form.reorderLevel}
-                onChange={(e) =>
-                  setForm({ ...form, reorderLevel: e.target.value })
-                }
+                value={values.reorderLevel}
+                error={fieldError("reorderLevel")}
+                onChange={(e) => setField("reorderLevel", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Save Product"}

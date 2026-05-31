@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { confirmDelete } from "@/lib/confirm";
 import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 export function TicketActions({
   ticketId,
@@ -20,10 +22,25 @@ export function TicketActions({
       body: JSON.stringify({ status: newStatus }),
     });
     if (res.ok) {
-      toast.success(`Ticket marked ${newStatus}`);
+      notify.success(`Ticket marked ${newStatus}`);
       router.refresh();
     } else {
-      toast.error("Update failed");
+      notify.error("Update failed");
+    }
+  }
+
+  async function remove() {
+    const ok = await confirmDelete("this support ticket");
+    if (!ok) return;
+    const res = await fetch(`/api/admin/support/${ticketId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      notify.success("Ticket deleted");
+      router.refresh();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      notify.error(data.error || "Delete failed");
     }
   }
 
@@ -49,6 +66,15 @@ export function TicketActions({
           Close
         </Button>
       )}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 w-7 p-0"
+        onClick={remove}
+        title="Delete ticket"
+      >
+        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+      </Button>
     </div>
   );
 }

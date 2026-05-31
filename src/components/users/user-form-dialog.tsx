@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { userSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus } from "lucide-react";
 
 interface Option {
@@ -37,43 +31,49 @@ export function UserFormDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    phone: "",
-    roleId: "",
-    branchId: "",
-  });
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    {
+      name: "",
+      email: "",
+      password: "",
+      phone: "",
+      roleId: "",
+      branchId: "",
+    },
+    userSchema
+  );
+
+  const roleOptions = roles.map((r) => ({ value: r.id, label: r.name }));
+  const branchOptions = [
+    { value: "", label: "No branch" },
+    ...branches.map((b) => ({ value: b.id, label: b.name })),
+  ];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
-          roleId: form.roleId || null,
-          branchId: form.branchId || null,
+          ...data,
+          roleId: data.roleId || null,
+          branchId: data.branchId || null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success("User created");
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success("User created");
       setOpen(false);
-      setForm({
-        name: "",
-        email: "",
-        password: "",
-        phone: "",
-        roleId: "",
-        branchId: "",
-      });
+      reset();
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create user");
+      notify.error(e instanceof Error ? e.message : "Failed to create user");
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export function UserFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 px-2.5 text-sm font-medium">
+      <DialogTrigger render={<Button />}>
         <Plus className="h-4 w-4" />
         Add User
       </DialogTrigger>
@@ -89,71 +89,71 @@ export function UserFormDialog({
         <DialogHeader>
           <DialogTitle>Invite Team Member</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Full Name *</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField
+            label="Full Name"
+            htmlFor="name"
+            required
+            error={fieldError("name")}
+          >
+            <FormInput
+              id="name"
+              name="name"
+              value={values.name}
+              error={fieldError("name")}
+              onChange={(e) => setField("name", e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Email *</Label>
-            <Input
+          </FormField>
+          <FormField
+            label="Email"
+            htmlFor="email"
+            required
+            error={fieldError("email")}
+          >
+            <FormInput
+              id="email"
+              name="email"
               type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
+              value={values.email}
+              error={fieldError("email")}
+              onChange={(e) => setField("email", e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Password *</Label>
-            <Input
+          </FormField>
+          <FormField
+            label="Password"
+            htmlFor="password"
+            required
+            error={fieldError("password")}
+          >
+            <FormInput
+              id="password"
+              name="password"
               type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              minLength={8}
-              required
+              value={values.password}
+              error={fieldError("password")}
+              onChange={(e) => setField("password", e.target.value)}
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select
-                value={form.roleId}
-                onValueChange={(v) => v && setForm({ ...form, roleId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Branch</Label>
-              <Select
-                value={form.branchId}
-                onValueChange={(v) => v && setForm({ ...form, branchId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FormSelect2
+              label="Role"
+              htmlFor="roleId"
+              required
+              options={roleOptions}
+              value={values.roleId}
+              onChange={(v) => setField("roleId", v)}
+              placeholder="Select role"
+              error={fieldError("roleId")}
+            />
+            <FormSelect2
+              label="Branch"
+              htmlFor="branchId"
+              options={branchOptions}
+              value={values.branchId}
+              onChange={(v) => setField("branchId", v)}
+              placeholder="Select branch"
+              error={fieldError("branchId")}
+            />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating..." : "Create User"}

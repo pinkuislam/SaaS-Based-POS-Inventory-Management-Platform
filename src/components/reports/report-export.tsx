@@ -1,20 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { useValidatedForm } from "@/hooks/use-validated-form";
+import { reportDateSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import { FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { escapeCsvCell } from "@/lib/utils";
+import { z } from "zod";
 
 const DEFAULT_TYPES = [
   { id: "sales", label: "Sales" },
@@ -22,6 +17,14 @@ const DEFAULT_TYPES = [
   { id: "stock", label: "Stock" },
   { id: "profit", label: "Profit & Loss" },
 ];
+
+const reportFilterSchema = reportDateSchema.extend({
+  reportType: z.string().min(1, "Select report type"),
+  branchId: z.string().optional(),
+  userId: z.string().optional(),
+  customerId: z.string().optional(),
+  supplierId: z.string().optional(),
+});
 
 export type ReportFilterOptions = {
   branches?: { id: string; name: string }[];
@@ -57,39 +60,65 @@ export function ReportExport({
   filterOptions?: ReportFilterOptions;
 }) {
   const [loading, setLoading] = useState(false);
-  const [reportType, setReportType] = useState(reportTypes[0]?.id || "sales");
-  const [from, setFrom] = useState(
-    format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "yyyy-MM-dd")
+  const defaultFrom = format(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    "yyyy-MM-dd"
   );
-  const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [branchId, setBranchId] = useState("all");
-  const [userId, setUserId] = useState("all");
-  const [customerId, setCustomerId] = useState("all");
-  const [supplierId, setSupplierId] = useState("all");
+  const defaultTo = format(new Date(), "yyyy-MM-dd");
+
+  const { values: form, setField, validate, fieldError: fe } = useValidatedForm(
+    {
+      reportType: reportTypes[0]?.id || "sales",
+      from: defaultFrom,
+      to: defaultTo,
+      branchId: "all",
+      userId: "all",
+      customerId: "all",
+      supplierId: "all",
+    },
+    reportFilterSchema
+  );
 
   const filters = {
-    branchId: branchId === "all" ? "" : branchId,
-    userId: userId === "all" ? "" : userId,
-    customerId: customerId === "all" ? "" : customerId,
-    supplierId: supplierId === "all" ? "" : supplierId,
+    branchId: form.branchId === "all" ? "" : form.branchId,
+    userId: form.userId === "all" ? "" : form.userId,
+    customerId: form.customerId === "all" ? "" : form.customerId,
+    supplierId: form.supplierId === "all" ? "" : form.supplierId,
   };
 
+  const reportTypeOptions = reportTypes.map((t) => ({
+    value: t.id,
+    label: t.label,
+  }));
+
   async function fetchReportData() {
-    const qs = buildQuery(reportType, from, to, filters);
+    const data = validate();
+    if (!data) return null;
+    const qs = buildQuery(data.reportType, data.from, data.to, {
+      branchId: data.branchId === "all" ? "" : data.branchId || "",
+      userId: data.userId === "all" ? "" : data.userId || "",
+      customerId: data.customerId === "all" ? "" : data.customerId || "",
+      supplierId: data.supplierId === "all" ? "" : data.supplierId || "",
+    });
     const res = await fetch(`/api/reports/export?${qs}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to fetch report");
-    return data;
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Failed to fetch report");
+    return { data: json, reportType: data.reportType, from: data.from, to: data.to };
   }
 
-  function downloadCsv(data: {
-    title: string;
-    rows: Record<string, unknown>[];
-    summary: { count: number; total: number };
-  }) {
+  function downloadCsv(
+    data: {
+      title: string;
+      rows: Record<string, unknown>[];
+      summary: { count: number; total: number };
+    },
+    reportType: string,
+    from: string,
+    to: string
+  ) {
     const rows = data.rows as Record<string, unknown>[];
     if (rows.length === 0) {
-      toast.error("No data to export");
+      notify.error("No data to export");
       return;
     }
     const headers = Object.keys(rows[0]);
@@ -100,7 +129,8 @@ export function ReportExport({
           .map((h) => {
             const val = row[h];
             const formatted =
-              val instanceof Date || (typeof val === "string" && val.includes("T"))
+              val instanceof Date ||
+              (typeof val === "string" && val.includes("T"))
                 ? format(new Date(val as string), "yyyy-MM-dd")
                 : val;
             return escapeCsvCell(formatted);
@@ -118,16 +148,17 @@ export function ReportExport({
     a.download = `${reportType}-report-${from}-${to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("CSV downloaded");
+    notify.success("CSV downloaded");
   }
 
   async function handleExportCsv() {
     setLoading(true);
     try {
-      const data = await fetchReportData();
-      downloadCsv(data);
+      const result = await fetchReportData();
+      if (!result) return;
+      downloadCsv(result.data, result.reportType, result.from, result.to);
     } catch {
-      toast.error("Export failed");
+      notify.error("Export failed");
     } finally {
       setLoading(false);
     }
@@ -136,7 +167,9 @@ export function ReportExport({
   async function handleExport() {
     setLoading(true);
     try {
-      const data = await fetchReportData();
+      const result = await fetchReportData();
+      if (!result) return;
+      const { data, reportType, from, to } = result;
 
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
@@ -166,7 +199,10 @@ export function ReportExport({
         const body = rows.map((row) =>
           headers.map((h) => {
             const val = row[h];
-            if (val instanceof Date || (typeof val === "string" && val.includes("T"))) {
+            if (
+              val instanceof Date ||
+              (typeof val === "string" && val.includes("T"))
+            ) {
               return format(new Date(val as string), "dd/MM/yyyy");
             }
             if (typeof val === "number") return val.toFixed(2);
@@ -194,9 +230,9 @@ export function ReportExport({
       }
 
       doc.save(`${reportType}-report-${from}-${to}.pdf`);
-      toast.success("PDF downloaded");
+      notify.success("PDF downloaded");
     } catch {
-      toast.error("Export failed");
+      notify.error("Export failed");
     } finally {
       setLoading(false);
     }
@@ -204,116 +240,94 @@ export function ReportExport({
 
   return (
     <div className="flex flex-wrap items-end gap-4 p-4 border rounded-lg bg-muted/30">
-      <div className="space-y-2">
-        <Label>Report type</Label>
-        <Select value={reportType} onValueChange={(v) => v && setReportType(v)}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {reportTypes.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label>From</Label>
-        <Input
+      <FormSelect2
+        label="Report type"
+        options={reportTypeOptions}
+        value={form.reportType}
+        onChange={(v) => setField("reportType", v)}
+        searchable={false}
+        className="w-[160px]"
+        error={fe("reportType")}
+      />
+      <FormField label="From" htmlFor="from" error={fe("from")}>
+        <FormInput
+          id="from"
           type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
           className="w-[160px]"
+          value={form.from}
+          error={fe("from")}
+          onChange={(e) => setField("from", e.target.value)}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>To</Label>
-        <Input
+      </FormField>
+      <FormField label="To" htmlFor="to" error={fe("to")}>
+        <FormInput
+          id="to"
           type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
           className="w-[160px]"
+          value={form.to}
+          error={fe("to")}
+          onChange={(e) => setField("to", e.target.value)}
         />
-      </div>
+      </FormField>
       {(filterOptions?.branches?.length ?? 0) > 0 && (
-        <div className="space-y-2">
-          <Label>Branch</Label>
-          <Select value={branchId} onValueChange={(v) => setBranchId(v ?? "")}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="All branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {filterOptions!.branches!.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <FormSelect2
+          label="Branch"
+          options={[
+            { value: "all", label: "All branches" },
+            ...filterOptions!.branches!.map((b) => ({
+              value: b.id,
+              label: b.name,
+            })),
+          ]}
+          value={form.branchId}
+          onChange={(v) => setField("branchId", v)}
+          className="w-[160px]"
+        />
       )}
       {(filterOptions?.users?.length ?? 0) > 0 && (
-        <div className="space-y-2">
-          <Label>Cashier</Label>
-          <Select value={userId} onValueChange={(v) => setUserId(v ?? "")}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="All users" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All users</SelectItem>
-              {filterOptions!.users!.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <FormSelect2
+          label="Cashier"
+          options={[
+            { value: "all", label: "All users" },
+            ...filterOptions!.users!.map((u) => ({
+              value: u.id,
+              label: u.name,
+            })),
+          ]}
+          value={form.userId}
+          onChange={(v) => setField("userId", v)}
+          className="w-[160px]"
+        />
       )}
       {(filterOptions?.customers?.length ?? 0) > 0 && (
-        <div className="space-y-2">
-          <Label>Customer</Label>
-          <Select
-            value={customerId}
-            onValueChange={(v) => setCustomerId(v ?? "")}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="All customers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All customers</SelectItem>
-              {filterOptions!.customers!.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <FormSelect2
+          label="Customer"
+          options={[
+            { value: "all", label: "All customers" },
+            ...filterOptions!.customers!.map((c) => ({
+              value: c.id,
+              label: c.name,
+            })),
+          ]}
+          value={form.customerId}
+          onChange={(v) => setField("customerId", v)}
+          className="w-[160px]"
+        />
       )}
       {(filterOptions?.suppliers?.length ?? 0) > 0 && (
-        <div className="space-y-2">
-          <Label>Supplier</Label>
-          <Select
-            value={supplierId}
-            onValueChange={(v) => setSupplierId(v ?? "")}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="All suppliers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All suppliers</SelectItem>
-              {filterOptions!.suppliers!.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <FormSelect2
+          label="Supplier"
+          options={[
+            { value: "all", label: "All suppliers" },
+            ...filterOptions!.suppliers!.map((s) => ({
+              value: s.id,
+              label: s.name,
+            })),
+          ]}
+          value={form.supplierId}
+          onChange={(v) => setField("supplierId", v)}
+          className="w-[160px]"
+        />
       )}
       <Button onClick={handleExport} disabled={loading}>
         <FileDown className="h-4 w-4 mr-2" />

@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { customerEditSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +21,11 @@ import {
 import { Pencil } from "lucide-react";
 import type { SerializedCustomerEdit } from "@/lib/serialize";
 
+const CUSTOMER_TYPE_OPTIONS = [
+  { value: "retail", label: "Retail" },
+  { value: "wholesale", label: "Wholesale" },
+];
+
 export function CustomerEditButton({
   customer,
 }: {
@@ -24,29 +34,36 @@ export function CustomerEditButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: customer.name,
-    phone: customer.phone || "",
-    email: customer.email || "",
-    address: customer.address || "",
-    customerType: customer.customerType,
-  });
+
+  const { values, setField, validate, fieldError } = useValidatedForm(
+    {
+      name: customer.name,
+      phone: customer.phone || "",
+      email: customer.email || "",
+      address: customer.address || "",
+      customerType: customer.customerType,
+    },
+    customerEditSchema
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch(`/api/customers/${customer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error();
-      toast.success("Customer updated");
+      notify.success("Customer updated");
       setOpen(false);
       router.refresh();
     } catch {
-      toast.error("Update failed");
+      notify.error("Update failed");
     } finally {
       setLoading(false);
     }
@@ -54,38 +71,66 @@ export function CustomerEditButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 w-8">
+      <DialogTrigger render={<Button variant="ghost" size="icon" />}>
         <Pencil className="h-4 w-4" />
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Customer</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField
+            label="Name"
+            htmlFor="name"
+            required
+            error={fieldError("name")}
+          >
+            <FormInput
+              id="name"
+              name="name"
+              value={values.name}
+              error={fieldError("name")}
+              onChange={(e) => setField("name", e.target.value)}
             />
-          </div>
+          </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            <FormField
+              label="Phone"
+              htmlFor="phone"
+              error={fieldError("phone")}
+            >
+              <FormInput
+                id="phone"
+                name="phone"
+                value={values.phone}
+                error={fieldError("phone")}
+                onChange={(e) => setField("phone", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+            </FormField>
+            <FormField
+              label="Email"
+              htmlFor="email"
+              error={fieldError("email")}
+            >
+              <FormInput
+                id="email"
+                name="email"
+                type="email"
+                value={values.email}
+                error={fieldError("email")}
+                onChange={(e) => setField("email", e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
+          <FormSelect2
+            label="Type"
+            htmlFor="customerType"
+            required
+            options={CUSTOMER_TYPE_OPTIONS}
+            value={values.customerType}
+            onChange={(v) => setField("customerType", v)}
+            error={fieldError("customerType")}
+          />
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Update"}
           </Button>

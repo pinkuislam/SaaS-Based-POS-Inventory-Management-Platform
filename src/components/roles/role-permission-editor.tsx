@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -44,7 +44,8 @@ export function RolePermissionEditor({
     );
   }
 
-  async function handleSave() {
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     try {
       const res = await fetch(`/api/roles/${roleId}`, {
@@ -54,11 +55,11 @@ export function RolePermissionEditor({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success("Permissions updated");
+      notify.success("Permissions updated");
       setOpen(false);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Update failed");
+      notify.error(e instanceof Error ? e.message : "Update failed");
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,14 @@ export function RolePermissionEditor({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+      <DialogTrigger
+        render={
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          />
+        }
+      >
         <Settings2 className="h-3 w-3" />
         Edit
       </DialogTrigger>
@@ -80,34 +88,37 @@ export function RolePermissionEditor({
         <DialogHeader>
           <DialogTitle>Permissions — {roleName}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          {ALL_PERMISSIONS.map((perm) => (
-            <label
-              key={perm}
-              className="flex items-center gap-3 text-sm cursor-pointer"
+        <form onSubmit={handleSave} className="space-y-4" noValidate>
+          <div className="space-y-3 py-2">
+            {ALL_PERMISSIONS.map((perm) => (
+              <label
+                key={perm}
+                className="flex items-center gap-3 text-sm cursor-pointer"
+              >
+                <Checkbox
+                  checked={selected.includes(perm)}
+                  onCheckedChange={() => toggle(perm)}
+                />
+                <Label className="cursor-pointer font-normal">
+                  {PERMISSION_LABELS[perm]}
+                </Label>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setSelected(permissions)}
             >
-              <Checkbox
-                checked={selected.includes(perm)}
-                onCheckedChange={() => toggle(perm)}
-              />
-              <Label className="cursor-pointer font-normal">
-                {PERMISSION_LABELS[perm]}
-              </Label>
-            </label>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => setSelected(permissions)}
-          >
-            Reset
-          </Button>
-          <Button className="flex-1" onClick={handleSave} disabled={loading}>
-            {loading ? "Saving..." : "Save Permissions"}
-          </Button>
-        </div>
+              Reset
+            </Button>
+            <Button type="submit" className="flex-1" disabled={loading}>
+              {loading ? "Saving..." : "Save Permissions"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

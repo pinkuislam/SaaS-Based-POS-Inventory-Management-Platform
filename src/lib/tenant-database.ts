@@ -1,11 +1,17 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
+import { existsSync } from "fs";
+import path from "path";
 import { promisify } from "util";
 import { createConnection } from "mariadb";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+function getPrismaCliPath(): string {
+  return path.join(process.cwd(), "node_modules", "prisma", "build", "index.js");
+}
 
 function parseDatabaseUrl(url: string) {
   const parsed = new URL(url);
@@ -31,6 +37,59 @@ export function buildTenantDatabaseUrl(dbName: string): string {
   return parsed.toString();
 }
 
+export async function tenantDatabaseExists(dbName: string): Promise<boolean> {
+  const config = parseDatabaseUrl(process.env.DATABASE_URL!);
+  const conn = await createConnection({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+  });
+  try {
+    const rows = (await conn.query(
+      "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+      [dbName]
+    )) as { SCHEMA_NAME: string }[];
+    return rows.length > 0;
+  } finally {
+    await conn.end();
+  }
+}
+
+export async function dropTenantDatabase(dbName: string) {
+  const config = parseDatabaseUrl(process.env.DATABASE_URL!);
+  const conn = await createConnection({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+  });
+  try {
+    await conn.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
+  } finally {
+    await conn.end();
+  }
+}
+
+export async function tenantDatabaseHasTables(dbName: string): Promise<boolean> {
+  const config = parseDatabaseUrl(process.env.DATABASE_URL!);
+  const conn = await createConnection({
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+  });
+  try {
+    const rows = (await conn.query(
+      `SELECT COUNT(*) AS c FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?`,
+      [dbName]
+    )) as { c: number }[];
+    return Number(rows[0]?.c ?? 0) > 0;
+  } finally {
+    await conn.end();
+  }
+}
+
 export async function createTenantDatabase(dbName: string) {
   const config = parseDatabaseUrl(process.env.DATABASE_URL!);
   const conn = await createConnection({
@@ -48,12 +107,78 @@ export async function createTenantDatabase(dbName: string) {
   }
 }
 
+function execErrorMessage(error: unknown): string {
+  if (error && typeof error === "object") {
+    const e = error as {
+      stderr?: string;
+      stdout?: string;
+      message?: string;
+      code?: string;
+    };
+    if (e.code === "EINVAL") {
+      return "Could not start Prisma CLI on this system. Restart the dev server and try again.";
+    }
+    const raw = [e.stderr, e.stdout, e.message].filter(Boolean).join("\n");
+    if (/disk is full|ENOSPC|not enough space/i.test(raw)) {
+      return (
+        "MySQL could not create tables because the server disk is full. " +
+        "Free space on drive F: (delete old files in storage/backups, empty Recycle Bin, remove .next folder), " +
+        "restart Laragon/MySQL, then click Provision again."
+      );
+    }
+    if (raw) {
+      const lines = raw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(
+          (l) =>
+            l &&
+            !l.startsWith("Usage") &&
+            !l.startsWith("Push the state") &&
+            !l.startsWith("Options") &&
+            !l.includes("schema-engine\\") &&
+            !l.includes("apply_migration.rs")
+        );
+      const msg = lines.find((l) => l.startsWith("Error:")) || lines.slice(-3).join(" ");
+      if (msg) return msg.replace(/^Error:\s*/i, "").slice(0, 500);
+      return lines.slice(-5).join(" ") || raw.slice(0, 400);
+    }
+  }
+  return "Failed to apply schema to tenant database";
+}
+
 export async function pushSchemaToTenantDatabase(dbName: string) {
   const url = buildTenantDatabaseUrl(dbName);
-  await execAsync("npx prisma db push --skip-generate", {
-    env: { ...process.env, DATABASE_URL: url },
-    cwd: process.cwd(),
-  });
+  const prismaCli = getPrismaCliPath();
+
+  if (!existsSync(prismaCli)) {
+    throw new Error(
+      "Prisma CLI not found. Run npm install in the project root first."
+    );
+  }
+
+  try {
+    // Run via node.exe — avoids Windows spawn EINVAL from npx.cmd / execFile
+    await execFileAsync(
+      process.execPath,
+      [
+        prismaCli,
+        "db",
+        "push",
+        "--url",
+        url,
+        "--accept-data-loss",
+      ],
+      {
+        cwd: process.cwd(),
+        env: process.env,
+        maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
+      }
+    );
+  } catch (error) {
+    throw new Error(execErrorMessage(error));
+  }
 }
 
 const tenantClients = new Map<string, PrismaClient>();
@@ -112,7 +237,18 @@ export async function provisionTenantDatabase(tenantId: string) {
 
   const dbName = tenant.dbName || buildTenantDatabaseName(tenant.slug);
 
-  await createTenantDatabase(dbName);
+  const exists = await tenantDatabaseExists(dbName);
+  const hasTables = exists ? await tenantDatabaseHasTables(dbName) : false;
+
+  // Recover from a previous failed provision (empty/partial schema)
+  if (exists && hasTables && !tenant.dbProvisioned) {
+    await dropTenantDatabase(dbName);
+  }
+
+  if (!(await tenantDatabaseExists(dbName))) {
+    await createTenantDatabase(dbName);
+  }
+
   await pushSchemaToTenantDatabase(dbName);
 
   await prisma.tenant.update({

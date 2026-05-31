@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { branchFormSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormField, FormInput } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -20,31 +22,38 @@ export function BranchFormDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    code: "",
-    phone: "",
-    address: "",
-    isMain: false,
-  });
+
+  const { values, setField, validate, fieldError, reset } = useValidatedForm(
+    {
+      name: "",
+      code: "",
+      phone: "",
+      address: "",
+      isMain: false,
+    },
+    branchFormSchema
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/branches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(data),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success("Branch created");
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success("Branch created");
       setOpen(false);
-      setForm({ name: "", code: "", phone: "", address: "", isMain: false });
+      reset();
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create branch");
+      notify.error(e instanceof Error ? e.message : "Failed to create branch");
     } finally {
       setLoading(false);
     }
@@ -52,7 +61,7 @@ export function BranchFormDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 h-8 px-2.5 text-sm font-medium">
+      <DialogTrigger render={<Button />}>
         <Plus className="h-4 w-4" />
         Add Branch
       </DialogTrigger>
@@ -60,47 +69,61 @@ export function BranchFormDialog() {
         <DialogHeader>
           <DialogTitle>Add Branch</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Name *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
+            <FormField
+              label="Name"
+              htmlFor="name"
+              required
+              error={fieldError("name")}
+            >
+              <FormInput
+                id="name"
+                name="name"
+                value={values.name}
+                error={fieldError("name")}
+                onChange={(e) => setField("name", e.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Code</Label>
-              <Input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
+            </FormField>
+            <FormField label="Code" htmlFor="code" error={fieldError("code")}>
+              <FormInput
+                id="code"
+                name="code"
+                value={values.code}
+                error={fieldError("code")}
+                onChange={(e) => setField("code", e.target.value)}
                 placeholder="BR-02"
               />
-            </div>
+            </FormField>
           </div>
-          <div className="space-y-2">
-            <Label>Phone</Label>
-            <Input
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          <FormField label="Phone" htmlFor="phone" error={fieldError("phone")}>
+            <FormInput
+              id="phone"
+              name="phone"
+              value={values.phone}
+              error={fieldError("phone")}
+              onChange={(e) => setField("phone", e.target.value)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Address</Label>
-            <Input
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
+          </FormField>
+          <FormField
+            label="Address"
+            htmlFor="address"
+            error={fieldError("address")}
+          >
+            <FormInput
+              id="address"
+              name="address"
+              value={values.address}
+              error={fieldError("address")}
+              onChange={(e) => setField("address", e.target.value)}
             />
-          </div>
+          </FormField>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
-              checked={form.isMain}
-              onCheckedChange={(c) =>
-                setForm({ ...form, isMain: c === true })
-              }
+              checked={values.isMain}
+              onCheckedChange={(c) => setField("isMain", c === true)}
             />
-            Set as main branch
+            <Label className="font-normal">Set as main branch</Label>
           </label>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Create Branch"}

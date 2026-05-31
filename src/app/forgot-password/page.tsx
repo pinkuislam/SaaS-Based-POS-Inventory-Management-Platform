@@ -2,29 +2,43 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { forgotPasswordSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { FormField, FormInput } from "@/components/ui/form-field";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { values, setField, validate, fieldError } = useValidatedForm(
+    { email: "" },
+    forgotPasswordSchema
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const data = validate();
+    if (!data) return;
+
     setLoading(true);
     try {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: data.email }),
       });
-      const data = await res.json();
-      toast.success(data.message);
+      const resData = await res.json();
+      notify.success(resData.message);
     } catch {
-      toast.error("Request failed");
+      notify.error("Request failed");
     } finally {
       setLoading(false);
     }
@@ -36,25 +50,35 @@ export default function ForgotPasswordPage() {
         <CardHeader>
           <CardTitle>Forgot Password</CardTitle>
           <CardDescription>
-            Enter your email. In development, check the server console for the reset link.
+            Enter your email. In development, check the server console for the
+            reset link.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            <FormField
+              label="Email"
+              htmlFor="email"
+              required
+              error={fieldError("email")}
+            >
+              <FormInput
+                id="email"
+                name="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                value={values.email}
+                error={fieldError("email")}
+                onChange={(e) => setField("email", e.target.value)}
               />
-            </div>
+            </FormField>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Sending..." : "Send Reset Link"}
             </Button>
           </form>
-          <Link href="/login" className="text-sm text-primary block mt-4 text-center">
+          <Link
+            href="/login"
+            className="text-sm text-primary block mt-4 text-center"
+          >
             Back to login
           </Link>
         </CardContent>

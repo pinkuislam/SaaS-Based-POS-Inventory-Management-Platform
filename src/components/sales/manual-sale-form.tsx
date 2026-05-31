@@ -2,18 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { manualSaleSchema } from "@/lib/schemas/forms";
+import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  FormField,
+  FormInput,
+  FormSelect2,
+} from "@/components/ui/form-field";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { decimalToNumber } from "@/lib/utils";
 
 type ProductHit = {
@@ -25,6 +23,13 @@ type ProductHit = {
 
 type CustomerOption = { id: string; name: string };
 
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "mobile", label: "Mobile" },
+  { value: "bank", label: "Bank" },
+];
+
 export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -33,10 +38,21 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
   const [lines, setLines] = useState<
     { productId: string; name: string; qty: string; price: string }[]
   >([]);
-  const [customerId, setCustomerId] = useState("walk-in");
-  const [paidAmount, setPaidAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [notes, setNotes] = useState("");
+
+  const { values, setField, validate, fieldError } = useValidatedForm(
+    {
+      customerId: "walk-in",
+      paymentMethod: "cash",
+      paidAmount: "",
+      notes: "",
+    },
+    manualSaleSchema
+  );
+
+  const customerOptions = [
+    { value: "walk-in", label: "Walk-in" },
+    ...customers.map((c) => ({ value: c.id, label: c.name })),
+  ];
 
   async function handleSearch() {
     if (!search.trim()) return;
@@ -70,9 +86,12 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (lines.length === 0) {
-      toast.error("Add at least one product");
+      notify.error("Add at least one product");
       return;
     }
+
+    const data = validate();
+    if (!data) return;
 
     const items = lines.map((l) => {
       const quantity = parseFloat(l.qty);
@@ -88,7 +107,7 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
     });
 
     const total = subtotal;
-    const paid = paidAmount ? parseFloat(paidAmount) : total;
+    const paid = data.paidAmount ? parseFloat(data.paidAmount) : total;
 
     setLoading(true);
     try {
@@ -97,37 +116,37 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items,
-          customerId: customerId === "walk-in" ? null : customerId,
+          customerId: data.customerId === "walk-in" ? null : data.customerId,
           subtotal: total,
           discount: 0,
           tax: 0,
           total,
           paidAmount: paid,
-          paymentMethod,
-          notes: notes ? `[Manual] ${notes}` : "[Manual sale]",
+          paymentMethod: data.paymentMethod,
+          notes: data.notes ? `[Manual] ${data.notes}` : "[Manual sale]",
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      toast.success(`Sale ${data.invoiceNo} created`);
-      router.push(`/dashboard/sales/${data.id}`);
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error);
+      notify.success(`Sale ${resData.invoiceNo} created`);
+      router.push(`/dashboard/sales/${resData.id}`);
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sale failed");
+      notify.error(err instanceof Error ? err.message : "Sale failed");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
       <Card>
         <CardHeader>
           <CardTitle>Add products</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
-            <Input
+            <FormInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, SKU, barcode..."
@@ -159,7 +178,7 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
               <span className="flex-1 text-sm font-medium truncate">
                 {line.name}
               </span>
-              <Input
+              <FormInput
                 type="number"
                 min="0.001"
                 step="any"
@@ -171,7 +190,7 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
                   setLines(next);
                 }}
               />
-              <Input
+              <FormInput
                 type="number"
                 step="0.01"
                 className="w-24"
@@ -200,57 +219,57 @@ export function ManualSaleForm({ customers }: { customers: CustomerOption[] }) {
           <CardTitle>Payment</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Customer</Label>
-            <Select
-              value={customerId}
-              onValueChange={(v) => setCustomerId(v ?? "walk-in")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Walk-in" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="walk-in">Walk-in</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Payment method</Label>
-            <Select value={paymentMethod} onValueChange={(v) => v && setPaymentMethod(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="mobile">Mobile</SelectItem>
-                <SelectItem value="bank">Bank</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Total</Label>
-            <Input value={subtotal.toFixed(2)} readOnly />
-          </div>
-          <div className="space-y-2">
-            <Label>Paid amount</Label>
-            <Input
+          <FormSelect2
+            label="Customer"
+            htmlFor="customerId"
+            options={customerOptions}
+            value={values.customerId}
+            onChange={(v) => setField("customerId", v)}
+            placeholder="Walk-in"
+            error={fieldError("customerId")}
+          />
+          <FormSelect2
+            label="Payment method"
+            htmlFor="paymentMethod"
+            required
+            options={PAYMENT_METHOD_OPTIONS}
+            value={values.paymentMethod}
+            onChange={(v) => setField("paymentMethod", v)}
+            error={fieldError("paymentMethod")}
+          />
+          <FormField label="Total">
+            <FormInput value={subtotal.toFixed(2)} readOnly />
+          </FormField>
+          <FormField
+            label="Paid amount"
+            htmlFor="paidAmount"
+            error={fieldError("paidAmount")}
+          >
+            <FormInput
+              id="paidAmount"
+              name="paidAmount"
               type="number"
               step="0.01"
-              value={paidAmount}
-              onChange={(e) => setPaidAmount(e.target.value)}
+              value={values.paidAmount}
+              error={fieldError("paidAmount")}
+              onChange={(e) => setField("paidAmount", e.target.value)}
               placeholder={subtotal.toFixed(2)}
             />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+          </FormField>
+          <FormField
+            label="Notes"
+            htmlFor="notes"
+            className="sm:col-span-2"
+            error={fieldError("notes")}
+          >
+            <FormInput
+              id="notes"
+              name="notes"
+              value={values.notes}
+              error={fieldError("notes")}
+              onChange={(e) => setField("notes", e.target.value)}
+            />
+          </FormField>
         </CardContent>
       </Card>
 

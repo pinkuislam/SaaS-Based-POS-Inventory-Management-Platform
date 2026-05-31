@@ -1,22 +1,5 @@
 import nodemailer from "nodemailer";
-
-const smtpConfigured =
-  process.env.SMTP_HOST &&
-  process.env.SMTP_USER &&
-  process.env.SMTP_PASS;
-
-function getTransporter() {
-  if (!smtpConfigured) return null;
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
+import { getSmtpConfig } from "@/lib/smtp-settings";
 
 export async function sendEmail({
   to,
@@ -29,14 +12,24 @@ export async function sendEmail({
   html: string;
   text?: string;
 }) {
-  const transporter = getTransporter();
-  if (!transporter) {
+  const smtp = await getSmtpConfig();
+  if (!smtp.configured) {
     console.log("[Email skipped - SMTP not configured]", { to, subject });
     return { sent: false, reason: "smtp_not_configured" };
   }
 
+  const transporter = nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    auth: {
+      user: smtp.user,
+      pass: smtp.pass,
+    },
+  });
+
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: smtp.from || smtp.user,
     to,
     subject,
     html,
@@ -44,6 +37,11 @@ export async function sendEmail({
   });
 
   return { sent: true };
+}
+
+export async function isEmailConfigured() {
+  const smtp = await getSmtpConfig();
+  return smtp.configured;
 }
 
 export async function sendLowStockAlertEmail({
@@ -75,10 +73,6 @@ export async function sendLowStockAlertEmail({
       <p><a href="${process.env.NEXTAUTH_URL}/dashboard/inventory">View Inventory</a></p>
     `,
   });
-}
-
-export function isEmailConfigured() {
-  return !!smtpConfigured;
 }
 
 export async function sendPasswordResetEmail({

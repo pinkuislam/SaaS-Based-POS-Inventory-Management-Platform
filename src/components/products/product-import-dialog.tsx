@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,7 +35,7 @@ export function ProductImportDialog() {
   async function handleImport() {
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      toast.error("Select a CSV file");
+      notify.error("Select a CSV file");
       return;
     }
 
@@ -51,7 +51,7 @@ export function ProductImportDialog() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.success(
+      notify.success(
         `Import done: ${data.created} created, ${data.updated} updated`
       );
       if (data.errors?.length) {
@@ -60,7 +60,7 @@ export function ProductImportDialog() {
       setOpen(false);
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Import failed");
+      notify.error(e instanceof Error ? e.message : "Import failed");
     } finally {
       setLoading(false);
     }

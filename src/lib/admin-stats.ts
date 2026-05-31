@@ -13,18 +13,29 @@ export async function getAdminPlatformStats() {
     activeTenants,
     pendingTenants,
     suspendedTenants,
+    inactiveTenants,
+    trialTenants,
+    expiredSubscriptions,
     subscriptions,
     activeSubscriptions,
     expiringSoon,
     tenantsByMonth,
     recentPayments,
+    pendingPayments,
+    openTickets,
     totalProducts,
     totalSales,
+    revenueByMonth,
   ] = await Promise.all([
-    prisma.tenant.count(),
-    prisma.tenant.count({ where: { status: "ACTIVE" } }),
-    prisma.tenant.count({ where: { status: "PENDING" } }),
-    prisma.tenant.count({ where: { status: "SUSPENDED" } }),
+    prisma.tenant.count({ where: { deletedAt: null } }),
+    prisma.tenant.count({ where: { status: "ACTIVE", deletedAt: null } }),
+    prisma.tenant.count({ where: { status: "PENDING", deletedAt: null } }),
+    prisma.tenant.count({ where: { status: "SUSPENDED", deletedAt: null } }),
+    prisma.tenant.count({
+      where: { status: { in: ["INACTIVE", "EXPIRED"] }, deletedAt: null },
+    }),
+    prisma.subscription.count({ where: { status: "TRIAL" } }),
+    prisma.subscription.count({ where: { status: "EXPIRED" } }),
     prisma.subscription.findMany({
       include: { package: true, tenant: true },
     }),
@@ -38,15 +49,31 @@ export async function getAdminPlatformStats() {
       take: 10,
     }),
     prisma.tenant.findMany({
-      where: { createdAt: { gte: thirtyDaysAgo } },
+      where: { createdAt: { gte: thirtyDaysAgo }, deletedAt: null },
       select: { createdAt: true },
     }),
     prisma.subscriptionPayment.findMany({
       where: { status: "PAID", paidAt: { gte: monthStart, lte: monthEnd } },
+      orderBy: { paidAt: "desc" },
+      take: 8,
+      include: {
+        subscription: { include: { tenant: true } },
+      },
+    }),
+    prisma.subscriptionPayment.count({ where: { status: "PENDING" } }),
+    prisma.supportTicket.count({
+      where: { status: { in: ["open", "pending"] } },
     }),
     prisma.product.count(),
     prisma.sale.count({
       where: { saleDate: { gte: monthStart, lte: monthEnd } },
+    }),
+    prisma.subscriptionPayment.findMany({
+      where: {
+        status: "PAID",
+        paidAt: { gte: subDays(now, 180) },
+      },
+      select: { paidAt: true, amount: true },
     }),
   ]);
 
@@ -71,7 +98,7 @@ export async function getAdminPlatformStats() {
   const packageBreakdown = await prisma.tenant.groupBy({
     by: ["packageId"],
     _count: true,
-    where: { packageId: { not: null } },
+    where: { packageId: { not: null }, deletedAt: null },
   });
 
   const packages = await prisma.subscriptionPackage.findMany();
@@ -80,18 +107,38 @@ export async function getAdminPlatformStats() {
     count: pb._count,
   }));
 
+  const revenueChart = Array.from({ length: 6 }, (_, i) => {
+    const d = subDays(startOfMonth(now), (5 - i) * 30);
+    const start = startOfMonth(d);
+    const end = endOfMonth(d);
+    const total = revenueByMonth
+      .filter((p) => p.paidAt && p.paidAt >= start && p.paidAt <= end)
+      .reduce((s, p) => s + decimalToNumber(p.amount), 0);
+    return {
+      month: format(start, "MMM yy"),
+      revenue: total,
+    };
+  });
+
   return {
     tenantCount,
     activeTenants,
     pendingTenants,
     suspendedTenants,
+    inactiveTenants,
+    trialTenants,
+    expiredSubscriptions,
     activeSubscriptions,
     expiringSoon,
     mrr,
     monthlyRevenue,
+    pendingPayments,
+    openTickets,
     totalProducts,
     totalSales,
     tenantGrowth,
     packageStats,
+    revenueChart,
+    recentPayments,
   };
 }

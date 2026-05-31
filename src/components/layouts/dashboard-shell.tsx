@@ -19,6 +19,7 @@ import {
   UserCog,
   CreditCard,
   Tags,
+  Plug,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SidebarNav, type NavItem } from "./sidebar-nav";
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { ImpersonationBanner } from "@/components/layouts/impersonation-banner";
 import { canAccessRoute } from "@/lib/route-permissions";
 import { tenantDashboardPath, tenantHomePath } from "@/lib/tenant-path";
 
@@ -53,6 +55,7 @@ function buildNavItems(tenantSlug: string): NavItem[] {
     { title: "Reports", href: d("/reports"), icon: BarChart3 },
     { title: "Users & Roles", href: d("/users"), icon: UserCog },
     { title: "Branches", href: d("/branches"), icon: Building2 },
+    { title: "Integrations", href: d("/integrations"), icon: Plug },
     { title: "Settings", href: d("/settings"), icon: Settings },
   ];
 }
@@ -107,6 +110,7 @@ export function DashboardShell({
       </aside>
 
       <div className="flex flex-1 flex-col">
+        <ImpersonationBanner />
         <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-card px-4">
           <Sheet>
             <SheetTrigger

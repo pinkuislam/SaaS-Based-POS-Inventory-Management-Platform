@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { usePosStore } from "@/stores/pos-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,7 @@ export function PosScreen() {
   function handleAddProduct(product: ProductResult) {
     const stock = decimalToNumber(product.stockQty);
     if (stock <= 0) {
-      toast.error("Product out of stock");
+      notify.error("Product out of stock");
       return;
     }
     addItem({
@@ -115,12 +115,12 @@ export function PosScreen() {
     });
     setSearch("");
     setProducts([]);
-    toast.success(`${product.name} added`);
+    notify.success(`${product.name} added`);
   }
 
   async function handleHold() {
     if (items.length === 0) {
-      toast.error("Cart is empty");
+      notify.error("Cart is empty");
       return;
     }
     setLoading(true);
@@ -154,11 +154,11 @@ export function PosScreen() {
       });
       if (!res.ok) throw new Error();
       const sale = await res.json();
-      toast.success(`Sale held: ${sale.invoiceNo}`);
+      notify.success(`Sale held: ${sale.invoiceNo}`);
       clearCart();
       setHeldKey((k) => k + 1);
     } catch {
-      toast.error("Failed to hold sale");
+      notify.error("Failed to hold sale");
     } finally {
       setLoading(false);
     }
@@ -166,7 +166,7 @@ export function PosScreen() {
 
   async function handleCheckout() {
     if (items.length === 0) {
-      toast.error("Cart is empty");
+      notify.error("Cart is empty");
       return;
     }
 
@@ -198,7 +198,7 @@ export function PosScreen() {
       const mobile = parseFloat(splitMobile) || 0;
       finalPaid = cash + card + mobile;
       if (Math.abs(finalPaid - total) > 0.01) {
-        toast.error("Split payments must equal total");
+        notify.error("Split payments must equal total");
         setLoading(false);
         return;
       }
@@ -226,14 +226,14 @@ export function PosScreen() {
       if (!res.ok) throw new Error("Sale failed");
 
       const sale = await res.json();
-      toast.success(`Sale completed! Invoice: ${sale.invoiceNo}`);
+      notify.success(`Sale completed! Invoice: ${sale.invoiceNo}`);
       clearCart();
       window.location.href = tenantDashboardPath(
         tenantSlug,
         `/sales/${sale.id}?print=thermal`
       );
     } catch {
-      toast.error("Failed to complete sale");
+      notify.error("Failed to complete sale");
     } finally {
       setLoading(false);
     }

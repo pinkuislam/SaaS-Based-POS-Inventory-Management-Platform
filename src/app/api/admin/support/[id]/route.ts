@@ -1,26 +1,75 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireSuperAdmin } from "@/lib/admin/require-admin";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireSuperAdmin();
+  if ("error" in auth) return auth.error;
+
+  const { id } = await params;
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id },
+    include: {
+      tenant: true,
+      assignedAdmin: { select: { id: true, name: true, email: true } },
+      replies: { orderBy: { createdAt: "asc" } },
+    },
+  });
+
+  if (!ticket) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(ticket);
+}
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (session?.user?.userType !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireSuperAdmin();
+  if ("error" in auth) return auth.error;
 
   const { id } = await params;
-  const { status, priority } = await request.json();
+  const body = await request.json();
+
+  const data: Record<string, unknown> = {};
+  if (body.status) data.status = body.status;
+  if (body.priority) data.priority = body.priority;
+  if (body.category) data.category = body.category;
+  if (body.assignedAdminId !== undefined) data.assignedAdminId = body.assignedAdminId;
 
   const ticket = await prisma.supportTicket.update({
     where: { id },
-    data: {
-      ...(status && { status }),
-      ...(priority && { priority }),
-    },
+    data,
   });
 
+  if (body.reply) {
+    await prisma.supportTicketReply.create({
+      data: {
+        ticketId: id,
+        authorType: "admin",
+        authorName: auth.session.user.name || "Admin",
+        message: body.reply,
+        isInternal: body.isInternal ?? false,
+      },
+    });
+  }
+
   return NextResponse.json(ticket);
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireSuperAdmin();
+  if ("error" in auth) return auth.error;
+
+  const { id } = await params;
+  await prisma.supportTicket.delete({ where: { id } });
+  return NextResponse.json({ success: true });
 }

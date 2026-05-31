@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { confirmDelete } from "@/lib/confirm";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FormField } from "@/components/ui/form-field";
 import Image from "next/image";
 import { Upload, Trash2 } from "lucide-react";
 
@@ -33,16 +34,22 @@ export function ProductImageUpload({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setPreview(data.image);
-      toast.success("Image uploaded");
+      notify.success("Image uploaded");
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      notify.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleRemove() {
+    const confirmed = await confirmDelete(
+      "Remove product image?",
+      "The image will be deleted from this product."
+    );
+    if (!confirmed) return;
+
     setLoading(true);
     try {
       const res = await fetch(`/api/products/${productId}/image`, {
@@ -50,18 +57,17 @@ export function ProductImageUpload({
       });
       if (!res.ok) throw new Error();
       setPreview(null);
-      toast.success("Image removed");
+      notify.success("Image removed");
       router.refresh();
     } catch {
-      toast.error("Failed to remove image");
+      notify.error("Failed to remove image");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-2">
-      <Label>Product Image</Label>
+    <FormField label="Product Image">
       {preview ? (
         <div className="flex items-start gap-4">
           <div className="relative h-24 w-24 rounded-lg border overflow-hidden bg-muted">
@@ -100,6 +106,6 @@ export function ProductImageUpload({
           />
         </label>
       </div>
-    </div>
+    </FormField>
   );
 }
