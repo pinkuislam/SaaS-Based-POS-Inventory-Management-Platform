@@ -1,0 +1,1254 @@
+# SaaS-Based POS & Inventory Management Platform
+
+## Project Plan and Requirement Document
+
+## 1. Project Overview
+
+The proposed system is a cloud-based SaaS POS and Inventory Management platform designed for retail shops, supermarkets, wholesalers, pharmacies, restaurants, electronics stores, fashion stores, and other small to medium businesses.
+
+The platform will allow multiple businesses to register, subscribe to a package, manage their own users, products, inventory, purchases, sales, billing, customers, suppliers, reports, and integrations from a secure web-based system.
+
+Each tenant/business will have a separate database to ensure data isolation, security, scalability, and easier backup management.
+
+---
+
+## 2. Main Objectives
+
+The main objectives of the platform are:
+
+1. Provide a complete POS and billing system for businesses.
+2. Manage inventory, stock, purchases, sales, customers, and suppliers.
+3. Support multi-tenant SaaS architecture with a separate database per tenant.
+4. Allow subscription-based package management.
+5. Provide role-based access for business owners, managers, cashiers, accountants, and staff.
+6. Generate business reports and analytics.
+7. Support future e-commerce integration.
+8. Provide a scalable platform for multiple industries and business types.
+
+---
+
+## 3. User Types
+
+### 3.1 Super Admin
+
+The Super Admin will manage the entire SaaS platform.
+
+Main responsibilities:
+
+* Manage all tenants/businesses
+* Create and manage subscription packages
+* View subscription status
+* Manage payments and invoices
+* Monitor tenant activity
+* Suspend or activate tenants
+* Manage system settings
+* View platform-level reports
+* Manage support tickets
+* Manage feature access based on package
+
+### 3.2 Tenant / Business Owner
+
+The business owner will manage their own company account.
+
+Main responsibilities:
+
+* Manage company profile
+* Manage branches
+* Manage users and roles
+* Manage products and inventory
+* Manage sales and purchases
+* View reports
+* Manage subscription and billing
+* Configure POS settings
+* Manage e-commerce integration
+
+### 3.3 Branch Manager
+
+The branch manager will manage assigned branch operations.
+
+Main responsibilities:
+
+* Manage branch stock
+* View branch sales
+* Manage branch users
+* Approve sales or purchase actions if permission is given
+* View branch reports
+
+### 3.4 Cashier / Sales Staff
+
+The cashier will mainly use the POS screen.
+
+Main responsibilities:
+
+* Create sales invoices
+* Scan/search products
+* Apply discounts
+* Receive payments
+* Print receipts
+* Manage returns if allowed
+* View own sales history
+
+### 3.5 Inventory Manager
+
+The inventory manager will handle stock-related operations.
+
+Main responsibilities:
+
+* Add or update products
+* Manage stock adjustments
+* Receive purchase stock
+* Transfer stock between branches
+* View low stock alerts
+* Manage damaged or expired stock
+
+### 3.6 Accountant
+
+The accountant will manage financial and reporting sections.
+
+Main responsibilities:
+
+* View purchase and sales reports
+* Manage expenses
+* View profit and loss
+* Manage supplier payments
+* Manage customer due payments
+* Export financial reports
+
+---
+
+## 4. Core Modules
+
+## 4.1 Multi-Tenant SaaS Architecture
+
+The system will support multiple tenants/businesses under one SaaS platform.
+
+### Key Features
+
+* Central master database for tenant registration and subscription data
+* Separate database for each tenant
+* Automatic tenant database creation during registration or admin approval
+* Tenant-specific login and dashboard
+* Tenant-specific users, products, sales, purchases, and reports
+* Data isolation between tenants
+* Tenant activation, suspension, and deletion control
+* Tenant database backup and restore system
+
+### Suggested Database Structure
+
+#### Master Database
+
+The master database will store SaaS-level information.
+
+Example tables:
+
+* tenants
+* tenant_domains
+* subscription_packages
+* subscriptions
+* subscription_payments
+* invoices
+* super_admins
+* system_settings
+* package_features
+* support_tickets
+
+#### Tenant Database
+
+Each tenant will have a separate database.
+
+Example tables:
+
+* users
+* roles
+* permissions
+* branches
+* products
+* product_categories
+* brands
+* units
+* customers
+* suppliers
+* purchases
+* purchase_items
+* sales
+* sale_items
+* payments
+* returns
+* stock_movements
+* expenses
+* reports_data
+* ecommerce_settings
+
+---
+
+## 4.2 POS & Billing Module
+
+The POS module will be the main sales interface for cashiers and sales staff.
+
+### Key Features
+
+* Fast POS screen
+* Product search by name, SKU, barcode, or category
+* Barcode scanner support
+* Cart management
+* Quantity update
+* Product discount
+* Invoice-level discount
+* VAT/tax calculation
+* Multiple payment methods
+* Cash payment
+* Card payment
+* Mobile banking payment
+* Split payment
+* Customer selection
+* Walk-in customer support
+* Invoice generation
+* Thermal receipt print
+* A4 invoice print
+* Sales hold/resume option
+* Sales return
+* Exchange management
+* Due sales
+* Paid and unpaid invoice tracking
+
+### POS Workflow
+
+1. Cashier opens POS screen.
+2. Cashier scans or searches product.
+3. Product is added to cart.
+4. Discount, VAT, or additional charges are applied if needed.
+5. Customer is selected or marked as walk-in customer.
+6. Payment method is selected.
+7. Invoice is generated.
+8. Stock is automatically reduced.
+9. Receipt is printed.
+
+---
+
+## 4.3 Inventory Management Module
+
+This module will manage all stock-related activities.
+
+### Key Features
+
+* Product management
+* Category management
+* Brand management
+* Unit management
+* SKU management
+* Barcode generation
+* Stock quantity tracking
+* Opening stock entry
+* Low stock alert
+* Expiry date tracking
+* Batch/lot tracking
+* Serial number tracking
+* Stock adjustment
+* Damaged stock management
+* Stock transfer between branches
+* Stock movement history
+* Inventory valuation
+* Reorder level setup
+* Product import/export
+
+### Product Information Fields
+
+Each product may include:
+
+* Product name
+* SKU
+* Barcode
+* Category
+* Brand
+* Unit
+* Purchase price
+* Selling price
+* Wholesale price
+* Tax/VAT
+* Discount
+* Opening stock
+* Current stock
+* Reorder level
+* Expiry date
+* Batch number
+* Product image
+* Product status
+
+---
+
+## 4.4 Purchase Management Module
+
+The purchase module will manage supplier purchases and stock receiving.
+
+### Key Features
+
+* Create purchase order
+* Select supplier
+* Add purchase products
+* Purchase invoice number
+* Purchase date
+* Purchase cost calculation
+* Discount and tax
+* Paid, partial paid, and due status
+* Supplier payment tracking
+* Purchase return
+* Purchase history
+* Stock auto-increase after purchase approval
+* Purchase invoice print
+* Purchase report
+
+### Purchase Workflow
+
+1. User creates a purchase entry.
+2. Supplier is selected.
+3. Products are added with quantity and purchase price.
+4. Tax, discount, and payment information are entered.
+5. Purchase is saved.
+6. Stock is automatically increased.
+7. Supplier balance is updated.
+
+---
+
+## 4.5 Sales Management Module
+
+The sales module will manage all sales transactions.
+
+### Key Features
+
+* Sales invoice creation
+* POS sales
+* Manual sales
+* Customer sales history
+* Sales return
+* Sales exchange
+* Due sales
+* Partial payment
+* Sales discount
+* Sales tax/VAT
+* Profit calculation
+* Sales report by date, product, user, branch, and customer
+* Invoice print and download
+
+---
+
+## 4.6 Customer Management Module
+
+This module will manage customer information and transaction history.
+
+### Key Features
+
+* Add customer
+* Edit customer
+* Customer group
+* Customer contact details
+* Customer opening balance
+* Customer due tracking
+* Customer payment history
+* Customer purchase history
+* Loyalty points
+* Customer statement
+* SMS/email notification support in future
+
+### Customer Fields
+
+* Customer name
+* Phone number
+* Email
+* Address
+* Customer type
+* Opening balance
+* Credit limit
+* Status
+
+---
+
+## 4.7 Supplier Management Module
+
+This module will manage supplier information, purchases, and payments.
+
+### Key Features
+
+* Add supplier
+* Edit supplier
+* Supplier contact details
+* Supplier opening balance
+* Supplier payment history
+* Supplier purchase history
+* Supplier due tracking
+* Supplier statement
+
+### Supplier Fields
+
+* Supplier name
+* Phone number
+* Email
+* Address
+* Company name
+* Opening balance
+* Status
+
+---
+
+## 4.8 Subscription & Package Management Module
+
+This module will control SaaS billing and feature access.
+
+### Key Features
+
+* Create subscription packages
+* Monthly, yearly, and custom billing cycle
+* Free trial option
+* Package-wise feature access
+* User limit per package
+* Branch limit per package
+* Product limit per package
+* Invoice limit per package
+* Storage limit
+* Subscription invoice generation
+* Payment status tracking
+* Auto-expiry control
+* Grace period
+* Tenant suspension after expiry
+* Upgrade/downgrade package
+* Payment gateway integration
+
+### Example Packages
+
+#### Starter Package
+
+Suitable for small shops.
+
+Features:
+
+* 1 branch
+* 2 users
+* POS and billing
+* Basic inventory
+* Basic reports
+
+#### Business Package
+
+Suitable for growing businesses.
+
+Features:
+
+* Multiple users
+* 2–3 branches
+* Purchase and sales management
+* Customer and supplier management
+* Advanced reports
+* Barcode support
+
+#### Enterprise Package
+
+Suitable for larger businesses.
+
+Features:
+
+* Unlimited or high-limit users
+* Multiple branches
+* Advanced inventory
+* Role permissions
+* E-commerce integration
+* API access
+* Priority support
+
+---
+
+## 4.9 Reports & Analytics Module
+
+The reporting module will help businesses understand sales, stock, profit, and financial performance.
+
+### Key Reports
+
+* Sales report
+* Purchase report
+* Stock report
+* Low stock report
+* Product-wise sales report
+* Category-wise sales report
+* Branch-wise sales report
+* User-wise sales report
+* Customer due report
+* Supplier due report
+* Profit and loss report
+* Expense report
+* Tax/VAT report
+* Daily summary report
+* Monthly summary report
+* Inventory valuation report
+* Return report
+* Payment method report
+
+### Dashboard Analytics
+
+The dashboard may show:
+
+* Today’s sales
+* Today’s profit
+* Today’s purchase
+* Total stock value
+* Low stock products
+* Top-selling products
+* Recent invoices
+* Monthly sales graph
+* Sales by payment method
+* Branch performance
+
+---
+
+## 4.10 User Roles & Permissions Module
+
+The system will include role-based access control for each tenant.
+
+### Key Features
+
+* Create custom roles
+* Assign permissions
+* Module-wise access control
+* Action-wise access control
+* Branch-wise access control
+* User activation/deactivation
+* Password reset
+* Login history
+* Activity log
+
+### Example Roles
+
+* Owner
+* Admin
+* Manager
+* Cashier
+* Inventory Manager
+* Accountant
+* Sales Staff
+
+### Example Permissions
+
+* View dashboard
+* Manage products
+* Create sales
+* Delete sales
+* Manage purchases
+* Manage customers
+* Manage suppliers
+* View reports
+* Manage users
+* Manage settings
+* Manage branches
+* Manage subscription
+
+---
+
+## 4.11 E-commerce Integration Module
+
+This module will allow tenants to connect their POS inventory with an online store.
+
+### Key Features
+
+* Product sync
+* Stock sync
+* Order sync
+* Customer sync
+* Online order management
+* E-commerce sales report
+* API-based integration
+* WooCommerce integration
+* Shopify integration in future
+* Custom website integration through API
+
+### Integration Workflow
+
+1. Tenant connects e-commerce store.
+2. Products are synced from POS to website or website to POS.
+3. Online orders are imported into the POS system.
+4. Stock is reduced automatically after online orders.
+5. Sales reports include both POS and online sales.
+
+---
+
+## 5. Additional Recommended Modules
+
+## 5.1 Branch Management
+
+For businesses with multiple outlets.
+
+Features:
+
+* Add branch
+* Assign users to branch
+* Branch-wise stock
+* Branch-wise sales
+* Branch-wise purchases
+* Stock transfer between branches
+* Branch performance report
+
+## 5.2 Expense Management
+
+Features:
+
+* Expense category
+* Add expense
+* Expense approval
+* Daily/monthly expense report
+* Profit and loss calculation
+
+## 5.3 Return & Refund Management
+
+Features:
+
+* Sales return
+* Purchase return
+* Refund processing
+* Exchange management
+* Return reason tracking
+* Stock adjustment after return
+
+## 5.4 Barcode Management
+
+Features:
+
+* Barcode generation
+* Barcode printing
+* Product barcode scan
+* Bulk barcode print
+* Custom barcode label size
+
+## 5.5 Notification Module
+
+Features:
+
+* Low stock alert
+* Subscription expiry alert
+* Payment due alert
+* Customer due alert
+* Supplier due alert
+* New order alert
+* System notification
+* Email notification
+* SMS notification in future
+
+## 5.6 Activity Log
+
+Features:
+
+* User login log
+* Product update log
+* Sales delete/update log
+* Purchase update log
+* Stock adjustment log
+* Permission change log
+* Subscription change log
+
+---
+
+## 6. Technical Requirements
+
+## 6.1 Recommended Technology Stack
+
+### Frontend
+
+* React.js or Next.js
+* Tailwind CSS or Bootstrap
+* ShadCN UI / modern component library
+* Axios or TanStack Query
+* Chart library for reports
+
+### Backend
+
+* Laravel, Node.js, or NestJS
+* REST API
+* JWT or session-based authentication
+* Role-based permission system
+* Queue system for background jobs
+* Cron jobs for subscription expiry and notifications
+
+### Database
+
+* Master database: MySQL or PostgreSQL
+* Tenant databases: MySQL or PostgreSQL
+* Optional: MongoDB for logs, notifications, and analytics
+
+### Hosting
+
+* Cloud server
+* NGINX or Apache
+* SSL certificate
+* Daily backup system
+* Object storage for files/images
+
+### Payment Gateway
+
+* SSLCommerz
+* Stripe
+* PayPal
+* Local mobile banking integration if required
+
+---
+
+## 6.2 Multi-Tenant Architecture Requirement
+
+The platform should follow a central SaaS architecture.
+
+### Master Database Responsibilities
+
+* Tenant registration
+* Tenant subscription
+* Package management
+* Payment records
+* Tenant database connection details
+* Tenant status
+* Super admin users
+
+### Tenant Database Responsibilities
+
+* Tenant users
+* Tenant products
+* Tenant inventory
+* Tenant sales
+* Tenant purchases
+* Tenant customers
+* Tenant suppliers
+* Tenant reports
+* Tenant settings
+
+### Tenant Identification Methods
+
+The system may identify tenants by:
+
+1. Subdomain
+   Example: `businessname.platform.com`
+
+2. Custom domain
+   Example: `shopdomain.com`
+
+3. Tenant login URL
+   Example: `platform.com/login/business-code`
+
+The recommended method is subdomain-based tenant identification for a SaaS platform.
+
+---
+
+## 7. Functional Requirements
+
+## 7.1 Super Admin Panel Requirements
+
+The Super Admin panel should include:
+
+* Dashboard
+* Tenant management
+* Package management
+* Subscription management
+* Payment management
+* Invoice management
+* Support ticket management
+* System settings
+* Feature control
+* Tenant database management
+* Reports and analytics
+
+## 7.2 Tenant Admin Panel Requirements
+
+The Tenant Admin panel should include:
+
+* Dashboard
+* POS
+* Products
+* Categories
+* Brands
+* Units
+* Stock management
+* Purchases
+* Sales
+* Customers
+* Suppliers
+* Expenses
+* Reports
+* Users
+* Roles and permissions
+* Branches
+* Settings
+* Subscription details
+* E-commerce integration
+
+## 7.3 POS Requirements
+
+The POS screen should include:
+
+* Product search
+* Barcode scan
+* Product cart
+* Quantity update
+* Discount
+* VAT/tax
+* Payment method
+* Customer selection
+* Invoice print
+* Hold sale
+* Return sale
+* Daily sale summary
+
+## 7.4 Inventory Requirements
+
+Inventory should support:
+
+* Product stock
+* Branch stock
+* Batch stock
+* Expiry stock
+* Stock adjustment
+* Stock transfer
+* Low stock alert
+* Product import/export
+* Stock report
+
+## 7.5 Reporting Requirements
+
+Reports should support:
+
+* Filter by date
+* Filter by branch
+* Filter by user
+* Filter by customer
+* Filter by supplier
+* Export to PDF
+* Export to Excel
+* Print option
+* Graphical analytics
+
+---
+
+## 8. Non-Functional Requirements
+
+## 8.1 Security
+
+The platform should include:
+
+* Secure authentication
+* Password hashing
+* Role-based permissions
+* Tenant data isolation
+* CSRF protection
+* XSS protection
+* SQL injection protection
+* API rate limiting
+* Login attempt limitation
+* Two-factor authentication in future
+* Activity logging
+* Regular backup
+
+## 8.2 Performance
+
+The platform should be optimized for:
+
+* Fast POS billing
+* Quick product search
+* Barcode scanning speed
+* Large product database
+* Large sales history
+* Report generation
+* Multi-branch data processing
+
+## 8.3 Scalability
+
+The system should support:
+
+* Multiple tenants
+* Separate tenant databases
+* Multiple branches per tenant
+* Large number of users
+* High sales transactions
+* Future mobile app
+* Future e-commerce API integration
+
+## 8.4 Backup and Recovery
+
+The platform should support:
+
+* Daily database backup
+* Tenant-wise backup
+* Master database backup
+* File backup
+* Restore option
+* Disaster recovery plan
+
+## 8.5 Audit and Compliance
+
+The system should maintain:
+
+* User activity logs
+* Sales modification logs
+* Deleted invoice logs
+* Stock adjustment logs
+* Payment logs
+* Subscription change logs
+
+---
+
+## 9. Project Development Phases
+
+## Phase 1: Planning and Requirement Analysis
+
+### Activities
+
+* Finalize business model
+* Finalize package structure
+* Finalize user roles
+* Finalize tenant database architecture
+* Prepare wireframes
+* Prepare technical architecture
+* Prepare development roadmap
+
+### Deliverables
+
+* Requirement document
+* System flow diagram
+* Database architecture plan
+* Module list
+* Project timeline
+
+---
+
+## Phase 2: UI/UX Design
+
+### Activities
+
+* Design Super Admin dashboard
+* Design Tenant Admin dashboard
+* Design POS screen
+* Design inventory pages
+* Design purchase and sales pages
+* Design reports pages
+* Design subscription pages
+* Design responsive layouts
+
+### Deliverables
+
+* Figma design
+* UI style guide
+* Component design
+* User flow design
+
+---
+
+## Phase 3: Backend Foundation
+
+### Activities
+
+* Setup backend project
+* Setup authentication
+* Setup master database
+* Setup tenant database creation process
+* Setup package and subscription system
+* Setup role and permission system
+* Setup API structure
+* Setup logging system
+
+### Deliverables
+
+* Backend base structure
+* Master database
+* Tenant database migration system
+* Authentication API
+* Tenant switching logic
+
+---
+
+## Phase 4: Core SaaS & Tenant Management
+
+### Activities
+
+* Tenant registration
+* Tenant approval
+* Tenant database creation
+* Tenant login
+* Tenant status management
+* Subscription package assignment
+* Subscription expiry logic
+* Super Admin tenant management
+
+### Deliverables
+
+* Working multi-tenant system
+* Super Admin tenant panel
+* Subscription control system
+
+---
+
+## Phase 5: POS & Sales Module
+
+### Activities
+
+* POS interface development
+* Product search
+* Cart system
+* Invoice generation
+* Payment processing
+* Receipt printing
+* Sales history
+* Sales return
+
+### Deliverables
+
+* Functional POS module
+* Sales invoice system
+* Receipt print system
+* Sales report
+
+---
+
+## Phase 6: Inventory & Purchase Module
+
+### Activities
+
+* Product management
+* Category, brand, and unit management
+* Stock management
+* Purchase management
+* Supplier management
+* Stock adjustment
+* Stock transfer
+* Low stock alert
+
+### Deliverables
+
+* Inventory module
+* Purchase module
+* Supplier module
+* Stock reports
+
+---
+
+## Phase 7: Customer, Supplier, Expense & Reports
+
+### Activities
+
+* Customer management
+* Supplier management
+* Expense management
+* Due tracking
+* Business reports
+* Dashboard analytics
+* Export options
+
+### Deliverables
+
+* Customer module
+* Supplier module
+* Expense module
+* Reports module
+
+---
+
+## Phase 8: E-commerce Integration
+
+### Activities
+
+* API structure
+* WooCommerce integration
+* Product sync
+* Stock sync
+* Order sync
+* E-commerce order management
+
+### Deliverables
+
+* API integration module
+* WooCommerce sync
+* Online order management
+
+---
+
+## Phase 9: Testing and Quality Assurance
+
+### Activities
+
+* Unit testing
+* API testing
+* UI testing
+* POS speed testing
+* Multi-tenant testing
+* Security testing
+* Role permission testing
+* Subscription expiry testing
+* Report testing
+
+### Deliverables
+
+* Bug report
+* Test report
+* Fixed and stable system
+* User acceptance testing version
+
+---
+
+## Phase 10: Deployment and Launch
+
+### Activities
+
+* Server setup
+* Domain and SSL setup
+* Production deployment
+* Database backup setup
+* Email setup
+* Payment gateway setup
+* Final testing
+* Client training
+
+### Deliverables
+
+* Live SaaS platform
+* Admin access
+* Tenant access
+* Deployment documentation
+* Training documentation
+
+---
+
+## 10. Suggested MVP Scope
+
+The first version should focus on the most important business features.
+
+### MVP Modules
+
+1. Super Admin panel
+2. Tenant registration
+3. Subscription package management
+4. Tenant database creation
+5. Tenant dashboard
+6. User roles and permissions
+7. Product management
+8. Inventory management
+9. POS and billing
+10. Sales management
+11. Purchase management
+12. Customer management
+13. Supplier management
+14. Basic reports
+15. Subscription expiry control
+
+### Advanced Features for Later Version
+
+* E-commerce integration
+* Mobile app
+* Loyalty points
+* SMS notification
+* Advanced analytics
+* AI-based sales prediction
+* Accounting software integration
+* Multi-language support
+* Offline POS mode
+* Custom domain support
+
+---
+
+## 11. Estimated Timeline
+
+### MVP Development Timeline
+
+| Phase   | Task                              | Estimated Duration |
+| ------- | --------------------------------- | ------------------ |
+| Phase 1 | Planning and Requirement Analysis | 1–2 weeks          |
+| Phase 2 | UI/UX Design                      | 2–3 weeks          |
+| Phase 3 | Backend Foundation                | 2–3 weeks          |
+| Phase 4 | SaaS Tenant Management            | 2–3 weeks          |
+| Phase 5 | POS & Sales Module                | 3–4 weeks          |
+| Phase 6 | Inventory & Purchase Module       | 3–4 weeks          |
+| Phase 7 | Customer, Supplier & Reports      | 2–3 weeks          |
+| Phase 8 | Testing & Bug Fixing              | 2–3 weeks          |
+| Phase 9 | Deployment & Training             | 1 week             |
+
+### Total Estimated MVP Timeline
+
+Approximately 4 to 6 months, depending on team size, design complexity, and integration requirements.
+
+---
+
+## 12. Suggested Team Structure
+
+### Required Team
+
+* Project Manager
+* UI/UX Designer
+* Frontend Developer
+* Backend Developer
+* QA Engineer
+* DevOps Engineer
+
+### Optional Team
+
+* Business Analyst
+* Mobile App Developer
+* SEO/Marketing Specialist
+* Technical Writer
+
+---
+
+## 13. Recommended Development Approach
+
+The project should be developed using an Agile methodology.
+
+### Suggested Sprint Structure
+
+Each sprint can be 2 weeks.
+
+Example sprint plan:
+
+* Sprint 1: Requirement finalization and architecture
+* Sprint 2: UI/UX design
+* Sprint 3: Authentication and tenant setup
+* Sprint 4: Subscription and package management
+* Sprint 5: Product and inventory module
+* Sprint 6: POS and billing module
+* Sprint 7: Purchase and supplier module
+* Sprint 8: Customer and sales reports
+* Sprint 9: Role permission and settings
+* Sprint 10: Testing and optimization
+* Sprint 11: Deployment and training
+
+---
+
+## 14. Key Business Benefits
+
+The platform will help businesses:
+
+* Manage sales faster
+* Reduce manual inventory mistakes
+* Track real-time stock
+* Manage multiple branches
+* Control user access
+* Track profit and loss
+* Manage supplier and customer dues
+* Improve business decision-making through reports
+* Connect offline POS sales with online e-commerce orders
+* Operate through a subscription-based cloud system
+
+---
+
+## 15. Future Enhancement Plan
+
+Future versions may include:
+
+* Mobile POS app
+* Offline POS mode
+* Android barcode scanner app
+* Customer loyalty system
+* SMS marketing
+* Email marketing
+* Advanced accounting module
+* Payroll module
+* AI-based stock prediction
+* Multi-language support
+* Franchise management
+* Marketplace integration
+* Shopify integration
+* REST API for third-party systems
+* White-label SaaS option
+
+---
+
+## 16. Conclusion
+
+The SaaS-based POS and Inventory Management platform will be a scalable, secure, and subscription-based business solution for retail and wholesale businesses. With multi-tenant architecture and a separate database per tenant, the system will provide strong data isolation, better security, and easier scalability.
+
+The first version should focus on SaaS foundation, POS, inventory, purchase, sales, customers, suppliers, reports, subscription packages, and role permissions. Advanced features such as e-commerce integration, mobile app, offline POS, and AI analytics can be added in later phases.
