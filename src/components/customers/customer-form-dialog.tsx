@@ -15,7 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 
-export function CustomerFormDialog() {
+export function CustomerFormDialog({
+  groups = [],
+}: {
+  groups?: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,6 +28,10 @@ export function CustomerFormDialog() {
     phone: "",
     email: "",
     address: "",
+    customerType: "retail",
+    openingBalance: "",
+    creditLimit: "",
+    groupId: "",
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,7 +41,12 @@ export function CustomerFormDialog() {
       const res = await fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          openingBalance: parseFloat(form.openingBalance) || 0,
+          creditLimit: parseFloat(form.creditLimit) || 0,
+          groupId: form.groupId || null,
+        }),
       });
       if (!res.ok) throw new Error();
       toast.success("Customer added");
@@ -78,6 +91,59 @@ export function CustomerFormDialog() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Input
+                value={form.customerType}
+                onChange={(e) =>
+                  setForm({ ...form, customerType: e.target.value })
+                }
+                placeholder="retail / wholesale"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Opening Balance</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.openingBalance}
+                onChange={(e) =>
+                  setForm({ ...form, openingBalance: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          {groups.length > 0 && (
+            <div className="space-y-2">
+              <Label>Customer Group</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                value={form.groupId}
+                onChange={(e) =>
+                  setForm({ ...form, groupId: e.target.value })
+                }
+              >
+                <option value="">None</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>Credit Limit</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.creditLimit}
+              onChange={(e) =>
+                setForm({ ...form, creditLimit: e.target.value })
+              }
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

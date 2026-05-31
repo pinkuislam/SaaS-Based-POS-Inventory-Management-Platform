@@ -4,38 +4,67 @@ A cloud-based multi-tenant SaaS platform for POS, billing, inventory, purchases,
 
 Based on the project requirements document in `docs/SaaS-Based POS & Inventory Management Platform.txt`.
 
+**Requirements audit:** see [`docs/REQUIREMENTS-CHECKLIST.md`](docs/REQUIREMENTS-CHECKLIST.md) for full doc §4 mapping (✅ / ⚠️ / ❌).
+
 ## Features (MVP)
 
-### Super Admin Panel (`/admin`)
-- Platform dashboard with tenant overview
-- Tenant management (activate, suspend, expire)
-- Subscription package management
-- Subscription tracking
-- Support tickets view
+### Super Admin Panel (`/admin/dashboard`)
 
-### Tenant Business Panel (`/dashboard`)
+**Sign in:** [http://localhost:3000/admin/login](http://localhost:3000/admin/login) (separate from business login at `/login`).
+- Platform dashboard with tenant overview (MRR, charts)
+- Tenant management (approve pending, activate, suspend, expire)
+- Subscription package CRUD
+- Subscription tracking & payment history
+- Support ticket management (status updates)
+- System settings
+
+### Tenant Business Panel
+
+- Dashboard home: `http://localhost:3000/demo-shop/dashboard`
+- Other modules: `http://localhost:3000/demo-shop/pos`, `/demo-shop/products`, etc.
+
+`/demo-shop` redirects to `/demo-shop/dashboard`. Legacy `/dashboard` URLs still work.
 - Business dashboard with sales analytics
-- **POS** - Fast point of sale with barcode/search, cart, payments
-- **Products** - Product catalog with categories, brands, units
+- **POS** - Fast POS with hold/resume, split payment, daily summary, due sales
+- **Products** - Catalog, edit, CSV import/export, barcode labels
 - **Inventory** - Stock levels, low stock alerts, movement history
 - **Sales** - Invoice history
-- **Purchases** - Create purchase orders, auto stock increase, supplier dues
+- **Purchases** - Create orders, print invoice, returns, supplier dues
 - **Categories** - Manage categories, brands, and units
 - **Stock adjustment** - Manual add/remove stock with audit trail
 - **Sales returns** - Full or partial returns with stock restoration
 - **Expense tracking** - Record expenses with categories
 - **Invoice print** - View and print sales receipts
+- **Due sales** - Partial payment at POS, collect dues later
+- **Customer payments** - Record payments against due invoices
+- **Purchase returns** - Full/partial returns with stock reduction
+- **Due collection** - Overview of customer & supplier balances
+- **Subdomain routing** - Access tenant via `{slug}.localhost:3000`
+- **Supplier payments** - Pay supplier dues against purchase invoices
+- **Add users & branches** - Team invites with plan limits
+- **Branch stock transfer** - Move stock between branches
+- **PDF reports** - Export sales, purchases, or stock reports
+- **Low stock alerts** - In-app notifications with bell icon
+- **Barcode labels** - Print CODE128 labels from products list
+- **Role permissions editor** - Customize role access per module
+- **Super Admin analytics** - MRR, tenant growth, package breakdown charts
 - **Customers** & **Suppliers** management
 - **Expenses** tracking
-- **Reports** - Monthly sales, purchases, profit estimates
+- **Reports** - Date filters, PDF + CSV export, profit & loss report
 - **Users & Roles** - RBAC with Owner, Manager, Cashier, etc.
 - **Branches** - Multi-branch support
-- **Settings** - Business profile and subscription info
+- **Settings** - Business profile, POS settings, billing (Stripe/SSLCommerz), login history, SMTP alerts, support tickets
+- **Forgot password** - `/forgot-password` and `/reset-password` (SMTP when configured)
+- **Customer/supplier statements** - JSON export from detail pages
+- **Extended reports** - Low stock, product/user/branch sales, tax, returns, dues, expiry
+- **Activity log** - Audit trail of sales, purchases, product updates
+- **Integrations** - WooCommerce connect, product/order sync, online orders list
 
 ### SaaS Foundation
-- Tenant registration with package selection
+- Tenant registration (pending Super Admin approval)
 - Subscription packages (Starter, Business, Enterprise)
-- Role-based permissions per tenant
+- Subscription expiry cron (`GET /api/cron/subscriptions`)
+- Role-based permissions (routes + APIs)
 - JWT authentication via NextAuth v5
 
 ## Tech Stack
@@ -76,6 +105,9 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+**Tenant subdomain (local):** [http://demo-shop.localhost:3000](http://demo-shop.localhost:3000)  
+Sign in with `owner@demoshop.com` — the slug must match the tenant account.
 
 ### Demo Accounts
 
@@ -121,17 +153,55 @@ prisma/
 | `npm run db:seed` | Seed demo data |
 | `npm run db:studio` | Open Prisma Studio |
 
-## Future Enhancements
+## Subscription Expiry Cron
 
-Per the requirements document, these can be added in later phases:
-- E-commerce integration (WooCommerce, Shopify)
-- Separate database per tenant
-- Subdomain-based tenant routing
+Schedule daily (Task Scheduler, cron, or Uptime Robot):
+
+```bash
+curl -H "x-cron-secret: YOUR_CRON_SECRET" http://localhost:3000/api/cron/subscriptions
+```
+
+Set `CRON_SECRET` in `.env`.
+
+## Subscription Payments (Stripe & SSLCommerz)
+
+**Super Admin** → `/admin/settings` — enable gateways and save API keys.
+
+**Tenant** → Settings → **Pay / Renew Subscription** (or `/demo-shop/settings/billing`).
+
+| Gateway | Currency | Notes |
+|---------|----------|--------|
+| Stripe | USD | Webhook: `{NEXTAUTH_URL}/api/webhooks/stripe` |
+| SSLCommerz | BDT | Sandbox toggle in admin settings |
+
+## Separate Database Per Tenant
+
+Super Admin → **Tenants** → **Provision DB** creates `inventory_pos_{slug}` on the same MySQL server and runs `prisma db push`.
+
+- Master DB keeps SaaS tables; dedicated DB is ready for isolated tenant data.
+- Default mode remains **shared DB** with `tenantId` until provisioned.
+- Use `getTenantDataClient(tenantId)` from `@/lib/tenant-database` when routing queries to dedicated DBs.
+
+## Thermal Receipt Printing
+
+After POS checkout, the app opens the **80mm thermal** receipt view. From any sale: **Thermal Receipt (80mm)** → Print (CSS `@page size: 80mm` for ESC/POS-style printers).
+
+## WooCommerce Integration
+
+1. Go to **Dashboard → Integrations**
+2. Enter store URL + REST API keys (WooCommerce → Settings → Advanced → REST API)
+3. **Test Connection** → **Sync Products** / **Sync Orders**
+
+Online orders import as POS sales and reduce stock automatically.
+
+## Future Enhancements (per requirements doc)
+
+- Shopify integration
+- Separate database per tenant (schema has `dbName` field)
 - Payment gateway (Stripe, SSLCommerz)
-- PDF/Excel report export
 - Thermal receipt printing
-- Mobile POS app
-- Offline mode
+- Mobile POS app & offline mode
+- Loyalty, SMS, AI analytics
 
 ## License
 

@@ -23,9 +23,13 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
-  Printer,
+  Pause,
 } from "lucide-react";
 import { formatCurrency, decimalToNumber } from "@/lib/utils";
+import { useSession } from "@/lib/auth-client";
+import { tenantDashboardPath } from "@/lib/tenant-path";
+import { HeldSalesPanel } from "@/components/pos/held-sales-panel";
+import { PosDailySummary } from "@/components/pos/pos-daily-summary";
 
 interface ProductResult {
   id: string;
@@ -38,11 +42,19 @@ interface ProductResult {
 }
 
 export function PosScreen() {
+  const { data: session } = useSession();
+  const tenantSlug = session?.user?.tenantSlug || "demo-shop";
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<ProductResult[]>([]);
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [paidAmount, setPaidAmount] = useState("");
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitCash, setSplitCash] = useState("");
+  const [splitCard, setSplitCard] = useState("");
+  const [splitMobile, setSplitMobile] = useState("");
+  const [heldKey, setHeldKey] = useState(0);
 
   const {
     items,
@@ -106,6 +118,52 @@ export function PosScreen() {
     toast.success(`${product.name} added`);
   }
 
+  async function handleHold() {
+    if (items.length === 0) {
+      toast.error("Cart is empty");
+      return;
+    }
+    setLoading(true);
+    const subtotal = getSubtotal();
+    const tax = getTax();
+    const total = getTotal();
+    const saleItems = items.map((item) => {
+      const lineSubtotal = item.unitPrice * item.quantity - item.discount;
+      const lineTax = (lineSubtotal * item.taxRate) / 100;
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        tax: lineTax,
+        total: lineSubtotal + lineTax,
+      };
+    });
+    try {
+      const res = await fetch("/api/sales/hold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: saleItems,
+          customerId,
+          subtotal,
+          discount: invoiceDiscount,
+          tax,
+          total,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const sale = await res.json();
+      toast.success(`Sale held: ${sale.invoiceNo}`);
+      clearCart();
+      setHeldKey((k) => k + 1);
+    } catch {
+      toast.error("Failed to hold sale");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleCheckout() {
     if (items.length === 0) {
       toast.error("Cart is empty");
@@ -130,6 +188,24 @@ export function PosScreen() {
       };
     });
 
+    let finalPaid = paidAmount !== "" ? parseFloat(paidAmount) : total;
+    let finalMethod = paymentMethod;
+    let splitPayments: Record<string, number> | undefined;
+
+    if (splitMode) {
+      const cash = parseFloat(splitCash) || 0;
+      const card = parseFloat(splitCard) || 0;
+      const mobile = parseFloat(splitMobile) || 0;
+      finalPaid = cash + card + mobile;
+      if (Math.abs(finalPaid - total) > 0.01) {
+        toast.error("Split payments must equal total");
+        setLoading(false);
+        return;
+      }
+      finalMethod = "split";
+      splitPayments = { cash, card, mobile };
+    }
+
     try {
       const res = await fetch("/api/sales", {
         method: "POST",
@@ -141,8 +217,9 @@ export function PosScreen() {
           discount: invoiceDiscount,
           tax,
           total,
-          paidAmount: total,
-          paymentMethod,
+          paidAmount: finalPaid,
+          paymentMethod: finalMethod,
+          splitPayments,
         }),
       });
 
@@ -151,6 +228,10 @@ export function PosScreen() {
       const sale = await res.json();
       toast.success(`Sale completed! Invoice: ${sale.invoiceNo}`);
       clearCart();
+      window.location.href = tenantDashboardPath(
+        tenantSlug,
+        `/sales/${sale.id}?print=thermal`
+      );
     } catch {
       toast.error("Failed to complete sale");
     } finally {
@@ -159,6 +240,9 @@ export function PosScreen() {
   }
 
   return (
+    <div className="space-y-4">
+      <PosDailySummary />
+      <HeldSalesPanel key={heldKey} onResume={() => setHeldKey((k) => k + 1)} />
     <div className="grid lg:grid-cols-3 gap-4 h-[calc(100vh-12rem)]">
       <div className="lg:col-span-2 flex flex-col gap-4">
         <Card>
@@ -328,6 +412,46 @@ export function PosScreen() {
             </div>
           </div>
 
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={splitMode}
+              onChange={(e) => setSplitMode(e.target.checked)}
+            />
+            Split payment
+          </label>
+          {splitMode && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Cash</label>
+                <Input
+                  type="number"
+                  className="h-8"
+                  value={splitCash}
+                  onChange={(e) => setSplitCash(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Card</label>
+                <Input
+                  type="number"
+                  className="h-8"
+                  value={splitCard}
+                  onChange={(e) => setSplitCard(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Mobile</label>
+                <Input
+                  type="number"
+                  className="h-8"
+                  value={splitMobile}
+                  onChange={(e) => setSplitMobile(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <Separator />
 
           <div className="space-y-2 text-sm">
@@ -356,6 +480,25 @@ export function PosScreen() {
               <span>Total</span>
               <span>{formatCurrency(getTotal())}</span>
             </div>
+            <div className="flex justify-between items-center gap-2 pt-1">
+              <span className="text-muted-foreground">Amount Paid</span>
+              <Input
+                type="number"
+                className="w-28 h-8 text-right"
+                placeholder={String(getTotal())}
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                min={0}
+              />
+            </div>
+            {paidAmount !== "" && parseFloat(paidAmount) < getTotal() && (
+              <div className="flex justify-between text-amber-600 text-sm">
+                <span>Due</span>
+                <span>
+                  {formatCurrency(getTotal() - (parseFloat(paidAmount) || 0))}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="mt-auto space-y-2">
@@ -364,7 +507,20 @@ export function PosScreen() {
               onClick={handleCheckout}
               disabled={loading || items.length === 0}
             >
-              {loading ? "Processing..." : `Pay ${formatCurrency(getTotal())}`}
+              {loading
+                ? "Processing..."
+                : paidAmount !== "" && parseFloat(paidAmount) < getTotal()
+                  ? `Save Due Sale`
+                  : `Pay ${formatCurrency(getTotal())}`}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleHold}
+              disabled={loading || items.length === 0}
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              Hold Sale
             </Button>
             <Button
               variant="outline"
@@ -377,6 +533,7 @@ export function PosScreen() {
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

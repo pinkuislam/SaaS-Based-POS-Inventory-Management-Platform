@@ -31,12 +31,24 @@ export function generateInvoiceNo(prefix: string, seq: number) {
 }
 
 export function slugify(text: string) {
+  if (!text) return "";
   return text
     .toLowerCase()
     .trim()
     .replace(/[^\w\s-]/g, "")
     .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+/** Escape a value for CSV export (never throws on null/undefined). */
+export function escapeCsvCell(value: unknown): string {
+  const str =
+    value instanceof Date
+      ? value.toISOString()
+      : value === null || value === undefined
+        ? ""
+        : String(value);
+  return `"${str.replace(/"/g, '""')}"`;
 }
 
 export function decimalToNumber(value: unknown): number {

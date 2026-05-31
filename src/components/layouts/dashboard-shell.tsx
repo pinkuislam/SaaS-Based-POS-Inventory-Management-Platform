@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "@/lib/auth-client";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -20,6 +20,7 @@ import {
   CreditCard,
   Tags,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { SidebarNav, type NavItem } from "./sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -32,30 +33,43 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { canAccessRoute } from "@/lib/route-permissions";
+import { tenantDashboardPath, tenantHomePath } from "@/lib/tenant-path";
 
-const navItems: NavItem[] = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "POS", href: "/dashboard/pos", icon: ShoppingCart },
-  { title: "Products", href: "/dashboard/products", icon: Package },
-  { title: "Categories", href: "/dashboard/categories", icon: Tags },
-  { title: "Inventory", href: "/dashboard/inventory", icon: Warehouse },
-  { title: "Sales", href: "/dashboard/sales", icon: Receipt },
-  { title: "Purchases", href: "/dashboard/purchases", icon: ShoppingBag },
-  { title: "Customers", href: "/dashboard/customers", icon: Users },
-  { title: "Suppliers", href: "/dashboard/suppliers", icon: Truck },
-  { title: "Expenses", href: "/dashboard/expenses", icon: CreditCard },
-  { title: "Reports", href: "/dashboard/reports", icon: BarChart3 },
-  { title: "Users & Roles", href: "/dashboard/users", icon: UserCog },
-  { title: "Branches", href: "/dashboard/branches", icon: Building2 },
-  { title: "Settings", href: "/dashboard/settings", icon: Settings },
-];
+function buildNavItems(tenantSlug: string): NavItem[] {
+  const d = (sub: string) => tenantDashboardPath(tenantSlug, sub);
+  return [
+    { title: "Dashboard", href: tenantHomePath(tenantSlug), icon: LayoutDashboard },
+    { title: "POS", href: d("/pos"), icon: ShoppingCart },
+    { title: "Products", href: d("/products"), icon: Package },
+    { title: "Categories", href: d("/categories"), icon: Tags },
+    { title: "Inventory", href: d("/inventory"), icon: Warehouse },
+    { title: "Sales", href: d("/sales"), icon: Receipt },
+    { title: "Purchases", href: d("/purchases"), icon: ShoppingBag },
+    { title: "Customers", href: d("/customers"), icon: Users },
+    { title: "Suppliers", href: d("/suppliers"), icon: Truck },
+    { title: "Expenses", href: d("/expenses"), icon: CreditCard },
+    { title: "Reports", href: d("/reports"), icon: BarChart3 },
+    { title: "Users & Roles", href: d("/users"), icon: UserCog },
+    { title: "Branches", href: d("/branches"), icon: Building2 },
+    { title: "Settings", href: d("/settings"), icon: Settings },
+  ];
+}
 
-function SidebarContent() {
+function SidebarContent({ tenantSlug }: { tenantSlug: string }) {
   const { data: session } = useSession();
+  const permissions = session?.user?.permissions;
+  const navItems = buildNavItems(tenantSlug);
+  const visibleNav = navItems.filter((item) =>
+    canAccessRoute(item.href, permissions)
+  );
+  const home = tenantHomePath(tenantSlug);
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
-        <Link href="/dashboard" className="flex flex-col gap-1">
+        <Link href={home} className="flex flex-col gap-1">
           <span className="text-lg font-bold tracking-tight">InventoryPOS</span>
           <span className="text-xs text-muted-foreground truncate">
             {session?.user?.tenantName || "Business"}
@@ -63,7 +77,7 @@ function SidebarContent() {
         </Link>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <SidebarNav items={navItems} />
+        <SidebarNav items={visibleNav} />
       </div>
       <div className="border-t p-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -76,13 +90,20 @@ function SidebarContent() {
   );
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  tenantSlug,
+  children,
+}: {
+  tenantSlug: string;
+  children: React.ReactNode;
+}) {
   const { data: session } = useSession();
+  const settingsPath = tenantDashboardPath(tenantSlug, "/settings");
 
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="hidden w-64 shrink-0 border-r bg-card lg:block">
-        <SidebarContent />
+        <SidebarContent tenantSlug={tenantSlug} />
       </aside>
 
       <div className="flex flex-1 flex-col">
@@ -94,11 +115,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Menu className="h-5 w-5" />
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0">
-              <SidebarContent />
+              <SidebarContent tenantSlug={tenantSlug} />
             </SheetContent>
           </Sheet>
 
           <div className="flex-1" />
+
+          <NotificationBell tenantSlug={tenantSlug} />
 
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-lg hover:bg-muted px-2 py-1">
@@ -117,7 +140,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => (window.location.href = "/dashboard/settings")}
+                onClick={() => {
+                  window.location.href = settingsPath;
+                }}
               >
                 Settings
               </DropdownMenuItem>

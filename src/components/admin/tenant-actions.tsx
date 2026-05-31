@@ -34,6 +34,26 @@ export function TenantActions({
     }
   }
 
+  async function deleteTenant() {
+    if (
+      !confirm(
+        "Permanently delete this tenant and all business data? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/admin/tenants/${tenantId}`, {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      toast.success("Tenant deleted");
+      router.refresh();
+    } else {
+      toast.error(data.error || "Delete failed");
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -42,9 +62,9 @@ export function TenantActions({
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {status !== "ACTIVE" && (
+        {(status === "PENDING" || status !== "ACTIVE") && (
           <DropdownMenuItem onClick={() => updateStatus("ACTIVE")}>
-            Activate
+            {status === "PENDING" ? "Approve & Activate" : "Activate"}
           </DropdownMenuItem>
         )}
         {status === "ACTIVE" && (
@@ -54,6 +74,12 @@ export function TenantActions({
         )}
         <DropdownMenuItem onClick={() => updateStatus("EXPIRED")}>
           Mark Expired
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={deleteTenant}
+        >
+          Delete tenant permanently
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

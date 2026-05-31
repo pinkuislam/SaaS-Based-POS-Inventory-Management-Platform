@@ -1,0 +1,114 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Settings2 } from "lucide-react";
+import {
+  ALL_PERMISSIONS,
+  PERMISSION_LABELS,
+  type Permission,
+} from "@/lib/permissions";
+
+export function RolePermissionEditor({
+  roleId,
+  roleName,
+  permissions,
+  isDefault,
+}: {
+  roleId: string;
+  roleName: string;
+  permissions: string[];
+  isDefault: boolean;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string[]>(permissions);
+
+  const isOwner = roleName === "Owner" && isDefault;
+
+  function toggle(perm: Permission) {
+    setSelected((prev) =>
+      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
+    );
+  }
+
+  async function handleSave() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/roles/${roleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions: selected }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("Permissions updated");
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (isOwner) {
+    return (
+      <span className="text-xs text-muted-foreground">All permissions</span>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+        <Settings2 className="h-3 w-3" />
+        Edit
+      </DialogTrigger>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Permissions — {roleName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          {ALL_PERMISSIONS.map((perm) => (
+            <label
+              key={perm}
+              className="flex items-center gap-3 text-sm cursor-pointer"
+            >
+              <Checkbox
+                checked={selected.includes(perm)}
+                onCheckedChange={() => toggle(perm)}
+              />
+              <Label className="cursor-pointer font-normal">
+                {PERMISSION_LABELS[perm]}
+              </Label>
+            </label>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => setSelected(permissions)}
+          >
+            Reset
+          </Button>
+          <Button className="flex-1" onClick={handleSave} disabled={loading}>
+            {loading ? "Saving..." : "Save Permissions"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

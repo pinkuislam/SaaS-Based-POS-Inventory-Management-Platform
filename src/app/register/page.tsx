@@ -39,7 +39,7 @@ export default function RegisterPage() {
   function updateField(field: string, value: string) {
     setForm((prev) => {
       const updated = { ...prev, [field]: value };
-      if (field === "businessName" && !prev.slug) {
+      if (field === "businessName" && !prev.slug && value) {
         updated.slug = value
           .toLowerCase()
           .replace(/[^\w\s-]/g, "")
@@ -66,7 +66,9 @@ export default function RegisterPage() {
         return;
       }
 
-      toast.success("Registration successful! Please sign in.");
+      toast.success(
+        "Registration submitted! Your account is pending Super Admin approval before you can sign in."
+      );
       router.push("/login");
     } catch {
       toast.error("Something went wrong");

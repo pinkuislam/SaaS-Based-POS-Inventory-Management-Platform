@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       phone: body.phone,
       email: body.email,
       address: body.address,
+      openingBalance: body.openingBalance || 0,
     },
   });
 

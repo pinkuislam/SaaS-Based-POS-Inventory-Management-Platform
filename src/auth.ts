@@ -1,9 +1,11 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { authConfig } from "@/auth.config";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       name: "credentials",
@@ -11,6 +13,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         loginType: { label: "Login Type", type: "text" },
+        tenantSlug: { label: "Tenant Slug", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -18,6 +21,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = credentials.email as string;
         const password = credentials.password as string;
         const loginType = (credentials.loginType as string) || "tenant";
+        const expectedSlug = (credentials.tenantSlug as string) || "";
 
         if (loginType === "admin") {
           const admin = await prisma.superAdmin.findUnique({
@@ -49,6 +53,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user || !user.tenant) return null;
         if (user.tenant.status !== "ACTIVE") return null;
 
+        if (expectedSlug && user.tenant.slug !== expectedSlug) {
+          return null;
+        }
+
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return null;
 
@@ -71,35 +79,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.userType = user.userType;
-        token.tenantId = user.tenantId;
-        token.tenantSlug = user.tenantSlug;
-        token.tenantName = user.tenantName;
-        token.branchId = user.branchId;
-        token.role = user.role;
-        token.permissions = user.permissions;
+  events: {
+    async signIn({ user }) {
+      try {
+        await prisma.loginLog.create({
+          data: {
+            email: user.email || "",
+            userId: user.id,
+            tenantId: user.tenantId || null,
+            success: true,
+          },
+        });
+      } catch {
+        /* ignore log failures */
       }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub!;
-        session.user.userType = token.userType as string;
-        session.user.tenantId = token.tenantId as string | null;
-        session.user.tenantSlug = token.tenantSlug as string | null;
-        session.user.tenantName = token.tenantName as string | null;
-        session.user.branchId = token.branchId as string | null;
-        session.user.role = token.role as string;
-        session.user.permissions = token.permissions as string[];
-      }
-      return session;
     },
   },
-  pages: {
-    signIn: "/login",
-  },
-  session: { strategy: "jwt" },
 });

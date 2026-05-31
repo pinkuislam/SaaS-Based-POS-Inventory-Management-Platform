@@ -8,7 +8,7 @@ function parseDatabaseUrl(url: string) {
     port: parsed.port ? parseInt(parsed.port, 10) : 3306,
     user: decodeURIComponent(parsed.username),
     password: decodeURIComponent(parsed.password),
-    database: parsed.pathname.replace(/^\//, ""),
+    database: (parsed.pathname || "/").replace(/^\//, ""),
   };
 }
 

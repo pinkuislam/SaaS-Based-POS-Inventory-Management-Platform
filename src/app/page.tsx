@@ -99,7 +99,7 @@ export default function HomePage() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
-          <Link href="/login?type=admin">
+          <Link href="/admin/login">
             <Button size="lg" variant="outline">
               Platform Admin
             </Button>

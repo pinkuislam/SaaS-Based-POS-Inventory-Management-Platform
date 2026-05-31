@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/api-auth";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -33,13 +34,22 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requirePermission("manage_products");
+  if ("error" in authResult) return authResult.error;
 
-  const tenantId = session.user.tenantId;
+  const session = authResult.session;
+  const tenantId = session.user.tenantId!;
   const body = await request.json();
+
+  try {
+    const { assertProductLimit } = await import("@/lib/package-limits");
+    await assertProductLimit(tenantId);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Limit reached" },
+      { status: 400 }
+    );
+  }
 
   const product = await prisma.product.create({
     data: {
@@ -58,6 +68,8 @@ export async function POST(request: Request) {
       stockQty: body.stockQty || 0,
       reorderLevel: body.reorderLevel || 0,
       description: body.description,
+      batchNo: body.batchNo || null,
+      expiryDate: body.expiryDate ? new Date(body.expiryDate) : null,
     },
   });
 

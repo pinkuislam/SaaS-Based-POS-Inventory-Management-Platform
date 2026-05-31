@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         slug: finalSlug,
         email,
         phone,
-        status: "ACTIVE",
+        status: "PENDING",
         packageId: pkg?.id,
         dbName: `tenant_${finalSlug.replace(/-/g, "_")}`,
       },

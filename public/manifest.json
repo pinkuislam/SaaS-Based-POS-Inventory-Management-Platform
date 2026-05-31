@@ -1,0 +1,16 @@
+{
+  "name": "InventoryPOS",
+  "short_name": "InventoryPOS",
+  "description": "SaaS POS & Inventory Management",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

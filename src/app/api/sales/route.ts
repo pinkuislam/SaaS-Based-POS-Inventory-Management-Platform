@@ -1,18 +1,31 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requirePermission } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { generateInvoiceNo } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
+import { startOfDay, endOfDay } from "date-fns";
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(request: Request) {
+  const authResult = await requirePermission("create_sales");
+  if ("error" in authResult) return authResult.error;
+
+  const tenantId = authResult.session.user.tenantId!;
+  const { searchParams } = new URL(request.url);
+  const todayOnly = searchParams.get("today") === "1";
 
   const sales = await prisma.sale.findMany({
-    where: { tenantId: session.user.tenantId },
+    where: {
+      tenantId,
+      status: "COMPLETED",
+      ...(todayOnly && {
+        saleDate: {
+          gte: startOfDay(new Date()),
+          lte: endOfDay(new Date()),
+        },
+      }),
+    },
     orderBy: { saleDate: "desc" },
-    take: 100,
+    take: todayOnly ? 500 : 100,
     include: { customer: true, user: true, items: { include: { product: true } } },
   });
 
@@ -20,12 +33,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requirePermission("create_sales");
+  if ("error" in authResult) return authResult.error;
 
-  const tenantId = session.user.tenantId;
+  const session = authResult.session;
+  const tenantId = session.user.tenantId!;
   const body = await request.json();
   const {
     items,
@@ -38,10 +50,21 @@ export async function POST(request: Request) {
     paymentMethod,
     notes,
     branchId,
+    splitPayments,
   } = body;
 
   if (!items?.length) {
     return NextResponse.json({ error: "No items in sale" }, { status: 400 });
+  }
+
+  try {
+    const { assertInvoiceLimit } = await import("@/lib/package-limits");
+    await assertInvoiceLimit(tenantId);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Limit reached" },
+      { status: 400 }
+    );
   }
 
   const saleCount = await prisma.sale.count({ where: { tenantId } });
@@ -67,7 +90,9 @@ export async function POST(request: Request) {
         paymentMethod: paymentMethod || "cash",
         paymentStatus,
         status: "COMPLETED",
-        notes,
+        notes: splitPayments
+          ? JSON.stringify({ splitPayments, note: notes })
+          : notes,
         items: {
           create: items.map(
             (item: {
@@ -110,6 +135,32 @@ export async function POST(request: Request) {
     }
 
     return newSale;
+  });
+
+  if (customerId) {
+    try {
+      const { getTenantSettings } = await import("@/lib/tenant-settings");
+      const { pointsEarnedForSale } = await import("@/lib/loyalty");
+      const settings = await getTenantSettings(tenantId);
+      const earned = pointsEarnedForSale(Number(total), settings);
+      if (earned > 0) {
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: { loyaltyPoints: { increment: earned } },
+        });
+      }
+    } catch {
+      /* loyalty optional */
+    }
+  }
+
+  await logActivity({
+    tenantId,
+    userId: session.user.id,
+    userName: session.user.name,
+    action: "create_sale",
+    module: "sales",
+    details: `Sale ${invoiceNo} - ${total}`,
   });
 
   return NextResponse.json(sale);

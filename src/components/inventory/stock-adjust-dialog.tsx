@@ -21,14 +21,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SlidersHorizontal } from "lucide-react";
+import type { SerializedProductAdjustOption } from "@/lib/serialize";
 
-interface ProductOption {
-  id: string;
-  name: string;
-  stockQty: unknown;
-}
-
-export function StockAdjustDialog({ products }: { products: ProductOption[] }) {
+export function StockAdjustDialog({
+  products,
+}: {
+  products: SerializedProductAdjustOption[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -92,7 +91,7 @@ export function StockAdjustDialog({ products }: { products: ProductOption[] }) {
               <SelectContent>
                 {products.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.name} (current: {Number(p.stockQty)})
+                    {p.name} (current: {p.stockQty})
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "@/lib/auth-client";
 import {
   LayoutDashboard,
   Building2,
@@ -25,10 +25,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navItems: NavItem[] = [
-  { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { title: "Tenants", href: "/admin/tenants", icon: Building2 },
   { title: "Packages", href: "/admin/packages", icon: Package },
   { title: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard },
+  { title: "Payments", href: "/admin/payments", icon: CreditCard },
+  { title: "Billing", href: "/admin/billing", icon: CreditCard },
   { title: "Support", href: "/admin/support", icon: HeadphonesIcon },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -37,7 +39,7 @@ function SidebarContent() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
-        <Link href="/admin" className="flex flex-col gap-1">
+        <Link href="/admin/dashboard" className="flex flex-col gap-1">
           <span className="text-lg font-bold tracking-tight">
             Platform Admin
           </span>
@@ -88,7 +90,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={() => signOut({ callbackUrl: "/login?type=admin" })}
+                onClick={() => signOut({ callbackUrl: "/admin/login" })}
                 className="text-destructive"
               >
                 <LogOut className="mr-2 h-4 w-4" />

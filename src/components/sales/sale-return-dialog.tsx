@@ -39,6 +39,7 @@ export function SaleReturnDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [returnQtys, setReturnQtys] = useState<Record<string, string>>({});
+  const [returnReason, setReturnReason] = useState("");
 
   if (status === "RETURNED" || status === "CANCELLED") {
     return null;
@@ -56,7 +57,7 @@ export function SaleReturnDialog({
       const res = await fetch(`/api/sales/${saleId}/return`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ returnReason }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -91,7 +92,7 @@ export function SaleReturnDialog({
       const res = await fetch(`/api/sales/${saleId}/return`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: returnItems }),
+        body: JSON.stringify({ items: returnItems, returnReason }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -117,6 +118,14 @@ export function SaleReturnDialog({
           <DialogTitle>Return — {invoiceNo}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Return reason</Label>
+            <Input
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              placeholder="e.g. Defective, Wrong item"
+            />
+          </div>
           <Button
             variant="outline"
             className="w-full"

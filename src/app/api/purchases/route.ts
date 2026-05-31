@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requirePermission } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { generateInvoiceNo } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requirePermission("manage_purchases");
+  if ("error" in authResult) return authResult.error;
 
   const purchases = await prisma.purchase.findMany({
-    where: { tenantId: session.user.tenantId },
+    where: { tenantId: authResult.session.user.tenantId! },
     orderBy: { purchaseDate: "desc" },
     take: 100,
     include: {
@@ -24,12 +23,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requirePermission("manage_purchases");
+  if ("error" in authResult) return authResult.error;
 
-  const tenantId = session.user.tenantId;
+  const session = authResult.session;
+  const tenantId = session.user.tenantId!;
   const body = await request.json();
   const {
     items,
@@ -115,6 +113,15 @@ export async function POST(request: Request) {
     }
 
     return newPurchase;
+  });
+
+  await logActivity({
+    tenantId,
+    userId: session.user.id,
+    userName: session.user.name,
+    action: "create_purchase",
+    module: "purchases",
+    details: `Purchase ${invoiceNo}`,
   });
 
   return NextResponse.json(purchase);

@@ -76,5 +76,25 @@ export function hasPermission(
   userPermissions: string[],
   required: Permission
 ): boolean {
+  if (userPermissions.includes("*")) return true;
   return userPermissions.includes(required);
 }
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  view_dashboard: "View Dashboard",
+  manage_products: "Manage Products",
+  create_sales: "Create Sales",
+  delete_sales: "Delete Sales",
+  manage_purchases: "Manage Purchases",
+  manage_customers: "Manage Customers",
+  manage_suppliers: "Manage Suppliers",
+  view_reports: "View Reports",
+  manage_users: "Manage Users & Roles",
+  manage_settings: "Manage Settings",
+  manage_branches: "Manage Branches",
+  manage_pos: "Use POS",
+  manage_inventory: "Manage Inventory",
+  manage_expenses: "Manage Expenses",
+};
+
+export const ALL_PERMISSIONS = Object.values(PERMISSIONS);

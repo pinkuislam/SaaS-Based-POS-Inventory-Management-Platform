@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decimalToNumber } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(
   request: Request,
@@ -42,6 +43,9 @@ export async function POST(
           quantity:
             decimalToNumber(item.quantity) - decimalToNumber(item.returnedQty),
         }));
+
+  const returnReason =
+    typeof body.returnReason === "string" ? body.returnReason.trim() : "";
 
   const result = await prisma.$transaction(async (tx) => {
     for (const ret of itemsToReturn) {
@@ -97,6 +101,16 @@ export async function POST(
       where: { id: sale.id },
       include: { items: { include: { product: true } } },
     });
+  });
+
+  await logActivity({
+    tenantId,
+    userId: session.user.id,
+    userName: session.user.name || undefined,
+    action: "RETURN",
+    module: "sales",
+    details: `Return on ${sale.invoiceNo}${returnReason ? `: ${returnReason}` : ""}`,
+    metadata: { saleId: sale.id, returnReason },
   });
 
   return NextResponse.json(result);

@@ -25,6 +25,7 @@ export function SupplierFormDialog() {
     phone: "",
     email: "",
     address: "",
+    openingBalance: "",
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -34,12 +35,22 @@ export function SupplierFormDialog() {
       const res = await fetch("/api/suppliers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          openingBalance: parseFloat(form.openingBalance) || 0,
+        }),
       });
       if (!res.ok) throw new Error();
       toast.success("Supplier added");
       setOpen(false);
-      setForm({ name: "", companyName: "", phone: "", email: "", address: "" });
+      setForm({
+        name: "",
+        companyName: "",
+        phone: "",
+        email: "",
+        address: "",
+        openingBalance: "",
+      });
       router.refresh();
     } catch {
       toast.error("Failed to add supplier");
@@ -90,6 +101,17 @@ export function SupplierFormDialog() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Opening Balance</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.openingBalance}
+              onChange={(e) =>
+                setForm({ ...form, openingBalance: e.target.value })
+              }
+            />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Saving..." : "Save Supplier"}

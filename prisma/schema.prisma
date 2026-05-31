@@ -30,6 +30,7 @@ model SubscriptionPackage {
   maxBranches   Int      @default(1)
   maxProducts   Int      @default(500)
   maxInvoices   Int      @default(1000)
+  graceDays     Int      @default(7)
   features      Json     @default("[]")
   isActive      Boolean  @default(true)
   sortOrder     Int      @default(0)
@@ -50,6 +51,8 @@ model Tenant {
   logo        String?
   status      TenantStatus @default(PENDING)
   dbName      String?
+  dbProvisioned Boolean @default(false)
+  settings    Json     @default("{}")
   packageId   String?
   package     SubscriptionPackage? @relation(fields: [packageId], references: [id])
   createdAt   DateTime @default(now())
@@ -63,6 +66,7 @@ model Tenant {
   brands          Brand[]
   units           Unit[]
   products        Product[]
+  customerGroups  CustomerGroup[]
   customers       Customer[]
   suppliers       Supplier[]
   purchases       Purchase[]
@@ -71,6 +75,122 @@ model Tenant {
   expenseCategories ExpenseCategory[]
   stockMovements  StockMovement[]
   supportTickets  SupportTicket[]
+  customerPayments CustomerPayment[]
+  supplierPayments SupplierPayment[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  ecommerceSetting EcommerceSetting?
+  onlineOrders     OnlineOrder[]
+  loginLogs        LoginLog[]
+  apiKeys          TenantApiKey[]
+}
+
+model TenantApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model LoginLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  email     String
+  success   Boolean
+  ip        String?
+  userAgent String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model EcommerceSetting {
+  id             String    @id @default(cuid())
+  tenantId       String    @unique
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  platform       String    @default("woocommerce")
+  storeUrl       String
+  consumerKey    String    @db.Text
+  consumerSecret String    @db.Text
+  isActive       Boolean   @default(false)
+  syncProducts   Boolean   @default(true)
+  syncStock      Boolean   @default(true)
+  syncOrders     Boolean   @default(true)
+  lastProductSync DateTime?
+  lastOrderSync  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model OnlineOrder {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalId    String
+  platform      String   @default("woocommerce")
+  orderNumber   String
+  customerName  String?
+  customerEmail String?
+  total         Decimal  @db.Decimal(12, 2)
+  status        String
+  saleId        String?
+  orderDate     DateTime
+  syncedAt      DateTime @default(now())
+
+  @@unique([tenantId, platform, externalId])
+  @@index([tenantId, orderDate])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  userName  String?
+  action    String
+  module    String
+  details   String?  @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([module])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type      String   @default("info")
+  title     String
+  message   String   @db.Text
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, isRead])
+  @@index([tenantId, type])
 }
 
 enum TenantStatus {
@@ -138,6 +258,23 @@ model SystemSetting {
   id    String @id @default(cuid())
   key   String @unique
   value String @db.Text
+}
+
+model BillingCheckout {
+  id             String   @id @default(cuid())
+  tenantId       String
+  subscriptionId String?
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String   @default("USD")
+  gateway        String
+  externalRef    String?
+  status         String   @default("pending")
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([externalRef])
 }
 
 // ============ TENANT DATA ============
@@ -296,10 +433,27 @@ enum ProductStatus {
   INACTIVE
 }
 
+model CustomerGroup {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?  @db.Text
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customers Customer[]
+
+  @@unique([tenantId, name])
+}
+
 model Customer {
   id             String   @id @default(cuid())
   tenantId       String
   tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groupId        String?
+  group          CustomerGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   name           String
   phone          String?
   email          String?
@@ -312,9 +466,29 @@ model Customer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  sales Sale[]
+  sales    Sale[]
+  payments CustomerPayment[]
 
   @@index([tenantId, phone])
+  @@index([tenantId, groupId])
+}
+
+model CustomerPayment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  saleId      String?
+  sale        Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  amount      Decimal  @db.Decimal(12, 2)
+  method      String   @default("cash")
+  paymentDate DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, customerId])
+  @@index([saleId])
 }
 
 model Supplier {
@@ -332,8 +506,25 @@ model Supplier {
   updatedAt      DateTime @updatedAt
 
   purchases Purchase[]
+  payments  SupplierPayment[]
 
   @@index([tenantId])
+}
+
+model SupplierPayment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchaseId  String?
+  amount      Decimal  @db.Decimal(12, 2)
+  method      String   @default("cash")
+  paymentDate DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, supplierId])
 }
 
 model Purchase {
@@ -355,6 +546,7 @@ model Purchase {
   paidAmount    Decimal  @default(0) @db.Decimal(12, 2)
   dueAmount     Decimal  @default(0) @db.Decimal(12, 2)
   paymentStatus PurchasePaymentStatus @default(DUE)
+  status        PurchaseStatus @default(COMPLETED)
   notes         String?  @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -363,6 +555,7 @@ model Purchase {
 
   @@unique([tenantId, invoiceNo])
   @@index([tenantId, purchaseDate])
+  @@index([supplierId])
 }
 
 enum PurchasePaymentStatus {
@@ -371,14 +564,21 @@ enum PurchasePaymentStatus {
   DUE
 }
 
+enum PurchaseStatus {
+  COMPLETED
+  RETURNED
+  CANCELLED
+}
+
 model PurchaseItem {
-  id         String   @id @default(cuid())
-  purchaseId String
-  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  quantity   Decimal  @db.Decimal(12, 3)
-  unitPrice  Decimal  @db.Decimal(12, 2)
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Decimal  @db.Decimal(12, 3)
+  returnedQty Decimal  @default(0) @db.Decimal(12, 3)
+  unitPrice   Decimal  @db.Decimal(12, 2)
   discount   Decimal  @default(0) @db.Decimal(12, 2)
   tax        Decimal  @default(0) @db.Decimal(12, 2)
   total      Decimal  @db.Decimal(12, 2)
@@ -409,7 +609,8 @@ model Sale {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  items SaleItem[]
+  items    SaleItem[]
+  payments CustomerPayment[]
 
   @@unique([tenantId, invoiceNo])
   @@index([tenantId, saleDate])

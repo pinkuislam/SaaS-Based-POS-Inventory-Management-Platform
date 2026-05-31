@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   title: "InventoryPOS - SaaS POS & Inventory Management",
   description:
     "Cloud-based POS and inventory management platform for retail businesses",
+  manifest: "/manifest.json",
+  appleWebApp: { capable: true, title: "InventoryPOS" },
 };
 
 export default function RootLayout({
@@ -28,8 +30,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

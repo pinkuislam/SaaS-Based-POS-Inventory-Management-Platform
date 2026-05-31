@@ -48,6 +48,9 @@ export function ProductFormDialog({
     unitId: "",
     purchasePrice: "",
     sellingPrice: "",
+    wholesalePrice: "",
+    batchNo: "",
+    expiryDate: "",
     stockQty: "",
     reorderLevel: "10",
   });
@@ -63,6 +66,11 @@ export function ProductFormDialog({
           ...form,
           purchasePrice: parseFloat(form.purchasePrice) || 0,
           sellingPrice: parseFloat(form.sellingPrice) || 0,
+          wholesalePrice: form.wholesalePrice
+            ? parseFloat(form.wholesalePrice)
+            : null,
+          batchNo: form.batchNo || null,
+          expiryDate: form.expiryDate || null,
           stockQty: parseFloat(form.stockQty) || 0,
           reorderLevel: parseFloat(form.reorderLevel) || 0,
           categoryId: form.categoryId || null,
@@ -194,6 +202,36 @@ export function ProductFormDialog({
                   setForm({ ...form, sellingPrice: e.target.value })
                 }
                 required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Wholesale Price</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.wholesalePrice}
+                onChange={(e) =>
+                  setForm({ ...form, wholesalePrice: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Batch No</Label>
+              <Input
+                value={form.batchNo}
+                onChange={(e) => setForm({ ...form, batchNo: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Expiry Date</Label>
+              <Input
+                type="date"
+                value={form.expiryDate}
+                onChange={(e) =>
+                  setForm({ ...form, expiryDate: e.target.value })
+                }
               />
             </div>
           </div>
