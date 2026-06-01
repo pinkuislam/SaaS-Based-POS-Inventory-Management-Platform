@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { notify } from "@/lib/notify";
 import { confirmAction } from "@/lib/confirm";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/admin/loading-button";
 import { LogIn } from "lucide-react";
 
 export function ImpersonateButton({ tenantId }: { tenantId: string }) {
@@ -32,9 +32,14 @@ export function ImpersonateButton({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <Button variant="secondary" onClick={impersonate} disabled={loading}>
+    <ActionButton
+      variant="secondary"
+      onClick={impersonate}
+      loading={loading}
+      loadingText="Opening..."
+    >
       <LogIn className="mr-2 h-4 w-4" />
-      {loading ? "Opening..." : "Login as tenant"}
-    </Button>
+      Login as tenant
+    </ActionButton>
   );
 }

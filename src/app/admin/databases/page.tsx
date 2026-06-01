@@ -1,17 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
-import { DatabaseActions } from "@/components/admin/database-actions";
-import { BackupActions } from "@/components/admin/backup-actions";
+import { Card, CardContent } from "@/components/ui/card";
+import { DatabasesList } from "@/components/admin/lists/databases-list";
 
 export default async function DatabasesPage() {
   const [tenants, backups] = await Promise.all([
@@ -45,77 +34,26 @@ export default async function DatabasesPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Tenant Databases</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead>DB Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tenants.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.name}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {t.dbProvisioned
-                      ? t.dbName || `inventory_pos_${t.slug.replace(/-/g, "_")}`
-                      : "Shared (master DB)"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={t.dbProvisioned ? "default" : "secondary"}>
-                      {t.dbProvisioned ? "Provisioned" : "Not provisioned"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DatabaseActions tenantId={t.id} provisioned={t.dbProvisioned} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Backups</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead>File</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {backups.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell>{tenantNames[b.tenantId] || b.tenantId}</TableCell>
-                  <TableCell className="font-mono text-xs">{b.fileName}</TableCell>
-                  <TableCell>
-                    <Badge>{b.status}</Badge>
-                  </TableCell>
-                  <TableCell>{formatDate(b.createdAt)}</TableCell>
-                  <TableCell>
-                    <BackupActions
-                      backupId={b.id}
-                      canDownload={!!(b.filePath && b.status === "success")}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="pt-6">
+          <DatabasesList
+            tenants={tenants.map((t) => ({
+              id: t.id,
+              name: t.name,
+              slug: t.slug,
+              dbName: t.dbName,
+              dbProvisioned: t.dbProvisioned,
+              status: t.status,
+            }))}
+            backups={backups.map((b) => ({
+              id: b.id,
+              tenantId: b.tenantId,
+              tenantName: tenantNames[b.tenantId] || b.tenantId,
+              fileName: b.fileName,
+              status: b.status,
+              filePath: b.filePath,
+              createdAt: b.createdAt.toISOString(),
+            }))}
+          />
         </CardContent>
       </Card>
     </div>

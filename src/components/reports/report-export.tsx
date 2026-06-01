@@ -6,7 +6,7 @@ import { useValidatedForm } from "@/hooks/use-validated-form";
 import { reportDateSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
-import { FileDown } from "lucide-react";
+import { FileDown, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { escapeCsvCell } from "@/lib/utils";
 import { z } from "zod";
@@ -31,6 +31,7 @@ export type ReportFilterOptions = {
   users?: { id: string; name: string }[];
   customers?: { id: string; name: string }[];
   suppliers?: { id: string; name: string }[];
+  products?: { id: string; name: string }[];
 };
 
 function buildQuery(
@@ -159,6 +160,40 @@ export function ReportExport({
       downloadCsv(result.data, result.reportType, result.from, result.to);
     } catch {
       notify.error("Export failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePrint() {
+    setLoading(true);
+    try {
+      const result = await fetchReportData();
+      if (!result) return;
+      const { data, reportType, from, to } = result;
+      const rows = data.rows as Record<string, unknown>[];
+      const headers =
+        rows.length > 0 ? Object.keys(rows[0]) : ["No data"];
+      const html = `
+        <html><head><title>${data.title}</title>
+        <style>body{font-family:sans-serif;padding:24px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #ddd;padding:8px;text-align:left} th{background:#f5f5f5}</style>
+        </head><body>
+        <h1>${data.businessName || "InventoryPOS"}</h1>
+        <h2>${data.title}</h2>
+        <p>${from} — ${to}</p>
+        <table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((row) => `<tr>${headers.map((h) => `<td>${row[h] ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>
+        </table>
+        <p><strong>Total records:</strong> ${data.summary.count} | <strong>Total:</strong> ${data.summary.total}</p>
+        </body></html>`;
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+        w.print();
+      }
+    } catch {
+      notify.error("Print failed");
     } finally {
       setLoading(false);
     }
@@ -335,6 +370,10 @@ export function ReportExport({
       </Button>
       <Button variant="outline" onClick={handleExportCsv} disabled={loading}>
         Export CSV
+      </Button>
+      <Button variant="outline" onClick={handlePrint} disabled={loading}>
+        <Printer className="h-4 w-4 mr-2" />
+        Print
       </Button>
     </div>
   );

@@ -30,6 +30,8 @@ import { useSession } from "@/lib/auth-client";
 import { tenantDashboardPath } from "@/lib/tenant-path";
 import { HeldSalesPanel } from "@/components/pos/held-sales-panel";
 import { PosDailySummary } from "@/components/pos/pos-daily-summary";
+import { PosQuickProducts, type QuickProduct } from "@/components/pos/pos-quick-products";
+import { PosSalesBrowser } from "@/components/pos/pos-sales-browser";
 
 interface ProductResult {
   id: string;
@@ -38,7 +40,14 @@ interface ProductResult {
   barcode: string | null;
   sellingPrice: unknown;
   stockQty: unknown;
+  reorderLevel?: unknown;
   taxRate: unknown;
+}
+
+interface PosCustomer {
+  id: string;
+  name: string;
+  totalDue: number;
 }
 
 export function PosScreen() {
@@ -46,7 +55,8 @@ export function PosScreen() {
   const tenantSlug = session?.user?.tenantSlug || "demo-shop";
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<ProductResult[]>([]);
-  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<PosCustomer[]>([]);
+  const [selectedCustomerDue, setSelectedCustomerDue] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [paidAmount, setPaidAmount] = useState("");
@@ -55,6 +65,10 @@ export function PosScreen() {
   const [splitCard, setSplitCard] = useState("");
   const [splitMobile, setSplitMobile] = useState("");
   const [heldKey, setHeldKey] = useState(0);
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>(
+    []
+  );
 
   const {
     items,
@@ -64,6 +78,7 @@ export function PosScreen() {
     paymentMethod,
     addItem,
     updateQuantity,
+    updateDiscount,
     removeItem,
     setCustomer,
     setInvoiceDiscount,
@@ -84,6 +99,19 @@ export function PosScreen() {
     const data = await res.json();
     setProducts(data);
     setSearching(false);
+  }, [categoryId]);
+
+  useEffect(() => {
+    fetch("/api/categories?type=category")
+      .then((r) => r.json())
+      .then((data) =>
+        setCategories(
+          Array.isArray(data)
+            ? data.filter((c: { isActive?: boolean }) => c.isActive !== false)
+            : []
+        )
+      )
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -92,17 +120,58 @@ export function PosScreen() {
   }, [search, searchProducts]);
 
   useEffect(() => {
-    fetch("/api/customers")
+    if (categoryId) void searchProducts(search);
+  }, [categoryId, searchProducts, search]);
+
+  useEffect(() => {
+    fetch("/api/pos/customers")
       .then((r) => r.json())
-      .then(setCustomers)
+      .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
-  function handleAddProduct(product: ProductResult) {
+  useEffect(() => {
+    if (!customerId) {
+      setSelectedCustomerDue(0);
+      return;
+    }
+    const c = customers.find((x) => x.id === customerId);
+    setSelectedCustomerDue(c?.totalDue ?? 0);
+  }, [customerId, customers]);
+
+  async function resolveBarcodeAdd(q: string) {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    const res = await fetch(
+      `/api/products/search?q=${encodeURIComponent(trimmed)}`
+    );
+    const data: ProductResult[] = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      notify.error("No product found");
+      return;
+    }
+    const exact =
+      data.find((p) => p.barcode === trimmed) ||
+      (data.length === 1 ? data[0] : null);
+    if (exact) {
+      handleAddProduct(exact);
+    } else {
+      setProducts(data);
+      notify.info("Multiple matches — select a product");
+    }
+  }
+
+  function handleAddProduct(
+    product: ProductResult | QuickProduct
+  ) {
     const stock = decimalToNumber(product.stockQty);
+    const reorder = decimalToNumber(product.reorderLevel);
     if (stock <= 0) {
       notify.error("Product out of stock");
       return;
+    }
+    if (reorder > 0 && stock <= reorder) {
+      notify.warning(`Low stock: ${stock} left (reorder at ${reorder})`);
     }
     addItem({
       productId: product.id,
@@ -242,18 +311,46 @@ export function PosScreen() {
   return (
     <div className="space-y-4">
       <PosDailySummary />
-      <HeldSalesPanel key={heldKey} onResume={() => setHeldKey((k) => k + 1)} />
+      <div className="grid lg:grid-cols-2 gap-4">
+        <HeldSalesPanel key={heldKey} onResume={() => setHeldKey((k) => k + 1)} />
+        <PosSalesBrowser />
+      </div>
+      <PosQuickProducts onSelect={handleAddProduct} />
     <div className="grid lg:grid-cols-3 gap-4 h-[calc(100vh-12rem)]">
       <div className="lg:col-span-2 flex flex-col gap-4">
         <Card>
           <CardContent className="pt-4">
+            <div className="flex gap-2 flex-wrap">
+              <Select
+                value={categoryId || "all"}
+                onValueChange={(v) => setCategoryId(!v || v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, SKU, or scan barcode..."
+                placeholder="Search by name, SKU, barcode, or category..."
                 className="pl-10 text-lg h-12"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void resolveBarcodeAdd(search);
+                  }
+                }}
                 autoFocus
               />
             </div>
@@ -262,7 +359,13 @@ export function PosScreen() {
             )}
             {products.length > 0 && (
               <div className="mt-2 max-h-48 overflow-y-auto border rounded-lg divide-y">
-                {products.map((p) => (
+                {products.map((p) => {
+                  const stock = decimalToNumber(p.stockQty);
+                  const reorder = decimalToNumber(p.reorderLevel);
+                  const low =
+                    stock > 0 && reorder > 0 && stock <= reorder;
+                  const out = stock <= 0;
+                  return (
                   <button
                     key={p.id}
                     type="button"
@@ -275,16 +378,29 @@ export function PosScreen() {
                         {p.sku} {p.barcode && `| ${p.barcode}`}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right space-y-1">
                       <p className="font-semibold">
                         {formatCurrency(decimalToNumber(p.sellingPrice))}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Stock: {decimalToNumber(p.stockQty)}
-                      </p>
+                      <div className="flex items-center justify-end gap-1">
+                        <p className="text-xs text-muted-foreground">
+                          Stock: {stock}
+                        </p>
+                        {out && (
+                          <Badge variant="destructive" className="text-[10px] px-1">
+                            Out
+                          </Badge>
+                        )}
+                        {low && !out && (
+                          <Badge variant="secondary" className="text-[10px] px-1">
+                            Low
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -313,6 +429,23 @@ export function PosScreen() {
                       <p className="text-sm text-muted-foreground">
                         {formatCurrency(item.unitPrice)} each
                       </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-xs text-muted-foreground">
+                          Disc.
+                        </span>
+                        <Input
+                          type="number"
+                          className="h-7 w-16 text-xs"
+                          min={0}
+                          value={item.discount || ""}
+                          onChange={(e) =>
+                            updateDiscount(
+                              item.productId,
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                        />
+                      </div>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
@@ -389,6 +522,12 @@ export function PosScreen() {
                 ))}
               </SelectContent>
             </Select>
+            {selectedCustomerDue > 0 && (
+              <p className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-md px-2 py-1.5">
+                This customer has {formatCurrency(selectedCustomerDue)} outstanding
+                from previous sales.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

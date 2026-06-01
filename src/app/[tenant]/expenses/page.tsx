@@ -1,16 +1,10 @@
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency, formatDate, decimalToNumber } from "@/lib/utils";
+import { formatCurrency, decimalToNumber } from "@/lib/utils";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
+import { ExpenseCategoryManager } from "@/components/expenses/expense-category-manager";
+import { ExpensesListSection } from "@/components/expenses/expenses-list-section";
 import { StatCard } from "@/components/ui/stat-card";
 import { Wallet } from "lucide-react";
 
@@ -19,12 +13,12 @@ export default async function ExpensesPage() {
 
   const [expenses, categories] = await Promise.all([
     prisma.expense.findMany({
-      where: { tenantId },
+      where: { tenantId, deletedAt: null },
       include: { category: true },
       orderBy: { expenseDate: "desc" },
     }),
     prisma.expenseCategory.findMany({
-      where: { tenantId },
+      where: { tenantId, deletedAt: null },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -56,6 +50,8 @@ export default async function ExpensesPage() {
         <ExpenseFormDialog categories={categories} />
       </div>
 
+      <ExpenseCategoryManager />
+
       <div className="grid gap-4 md:grid-cols-2">
         <StatCard
           title="Total Expenses"
@@ -75,38 +71,18 @@ export default async function ExpensesPage() {
           <CardTitle>Expense Records</CardTitle>
         </CardHeader>
         <CardContent>
-          {expenses.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              No expenses recorded yet.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {expenses.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium">{e.title}</TableCell>
-                    <TableCell>{e.category?.name || "—"}</TableCell>
-                    <TableCell>
-                      {formatCurrency(decimalToNumber(e.amount))}
-                    </TableCell>
-                    <TableCell>{formatDate(e.expenseDate)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                      {e.notes || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <ExpensesListSection
+            categories={categories}
+            initialExpenses={expenses.map((e) => ({
+              id: e.id,
+              title: e.title,
+              categoryId: e.categoryId,
+              categoryName: e.category?.name ?? null,
+              amount: decimalToNumber(e.amount),
+              expenseDate: e.expenseDate.toISOString(),
+              notes: e.notes,
+            }))}
+          />
         </CardContent>
       </Card>
     </div>

@@ -72,7 +72,7 @@ export function StockTransferDialog({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/inventory/transfer", {
+      const res = await fetch("/api/inventory/transfers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -85,7 +85,9 @@ export function StockTransferDialog({
       });
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error);
-      notify.success(`Transfer complete (${resData.reference})`);
+      notify.success(
+        `Transfer request created (${resData.reference}). Approve from inventory.`
+      );
       setOpen(false);
       reset();
       router.refresh();

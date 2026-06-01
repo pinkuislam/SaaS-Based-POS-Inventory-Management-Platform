@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { notify } from "@/lib/notify";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/admin/loading-button";
 import { Mail } from "lucide-react";
 
 export function InvoiceSendButton({ invoiceId }: { invoiceId: string }) {
@@ -29,9 +29,15 @@ export function InvoiceSendButton({ invoiceId }: { invoiceId: string }) {
   }
 
   return (
-    <Button size="sm" variant="outline" onClick={send} disabled={loading}>
+    <ActionButton
+      size="sm"
+      variant="outline"
+      onClick={send}
+      loading={loading}
+      loadingText="Sending..."
+    >
       <Mail className="mr-1 h-3 w-3" />
-      {loading ? "..." : "Email"}
-    </Button>
+      Email
+    </ActionButton>
   );
 }

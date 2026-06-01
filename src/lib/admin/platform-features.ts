@@ -1,38 +1,61 @@
-export const DEFAULT_PLATFORM_FEATURES = [
-  { key: "pos_billing", name: "POS Billing", module: "POS" },
-  { key: "inventory", name: "Inventory Management", module: "Inventory" },
-  { key: "purchase", name: "Purchase Management", module: "Purchase" },
-  { key: "sales_return", name: "Sales Return", module: "Sales" },
-  { key: "barcode", name: "Barcode Printing", module: "Products" },
-  { key: "multi_branch", name: "Multi-Branch Access", module: "Branches" },
-  { key: "advanced_reports", name: "Advanced Reports", module: "Reports" },
-  { key: "ecommerce", name: "E-commerce Integration", module: "Integrations" },
-  { key: "api_access", name: "API Access", module: "API" },
-  { key: "user_roles", name: "User Role Management", module: "Users" },
-  { key: "customer_due", name: "Customer Due Tracking", module: "Customers" },
-  { key: "supplier_due", name: "Supplier Due Tracking", module: "Suppliers" },
-  { key: "expenses", name: "Expense Management", module: "Expenses" },
-] as const;
+import { unstable_cache, revalidateTag } from "next/cache";
+import { prisma } from "@/lib/prisma";
 
-export const DEFAULT_ADMIN_ROLES = [
-  {
-    name: "Owner",
-    description: "Full platform access",
-    permissions: ["*"],
-  },
-  {
-    name: "Billing Manager",
-    description: "Payments, invoices, subscriptions",
-    permissions: ["billing", "subscriptions", "payments", "invoices", "coupons"],
-  },
-  {
-    name: "Support Manager",
-    description: "Support tickets and tenant assistance",
-    permissions: ["support", "tenants.view", "tenants.impersonate"],
-  },
-  {
-    name: "Read-only Viewer",
-    description: "View-only access to dashboards and reports",
-    permissions: ["view"],
-  },
-] as const;
+export {
+  DEFAULT_ADMIN_ROLES,
+  DEFAULT_PLATFORM_FEATURES,
+} from "@/lib/admin/platform-feature-seed";
+
+export const PLATFORM_FEATURES_CACHE_TAG = "platform-features";
+
+const adminListSelect = {
+  id: true,
+  key: true,
+  name: true,
+  module: true,
+  description: true,
+  isActive: true,
+  sortOrder: true,
+} as const;
+
+export type PlatformFeatureListItem = {
+  id: string;
+  key: string;
+  name: string;
+  module: string;
+  description: string | null;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+async function queryPlatformFeaturesForAdmin(): Promise<PlatformFeatureListItem[]> {
+  return prisma.platformFeature.findMany({
+    select: adminListSelect,
+    orderBy: [{ module: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+  });
+}
+
+/** Cached list for admin features page and GET /api/admin/features */
+export const getPlatformFeaturesForAdmin = unstable_cache(
+  queryPlatformFeaturesForAdmin,
+  ["admin-platform-features-list"],
+  { revalidate: 120, tags: [PLATFORM_FEATURES_CACHE_TAG] }
+);
+
+async function queryActivePlatformFeaturesForPackages() {
+  return prisma.platformFeature.findMany({
+    where: { isActive: true },
+    select: { key: true, name: true, module: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+}
+
+export const getActivePlatformFeaturesForPackages = unstable_cache(
+  queryActivePlatformFeaturesForPackages,
+  ["active-platform-features-packages"],
+  { revalidate: 120, tags: [PLATFORM_FEATURES_CACHE_TAG] }
+);
+
+export function invalidatePlatformFeaturesCache() {
+  revalidateTag(PLATFORM_FEATURES_CACHE_TAG, "max");
+}

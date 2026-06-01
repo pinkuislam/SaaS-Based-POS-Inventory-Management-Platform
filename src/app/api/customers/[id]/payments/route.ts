@@ -52,7 +52,7 @@ export async function POST(
   const tenantId = session.user.tenantId;
   const { id: customerId } = await params;
   const body = await request.json();
-  const { amount, method, saleId, notes } = body;
+  const { amount, method, saleId, notes, transactionRef } = body;
 
   if (!amount || amount <= 0) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
@@ -127,6 +127,7 @@ export async function POST(
         saleId: saleId || null,
         amount,
         method: method || "cash",
+        transactionRef: transactionRef?.trim() || null,
         notes,
       },
       include: { sale: true },

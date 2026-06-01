@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyImpersonationToken } from "@/lib/admin/impersonation";
 import { verifyTotpCode } from "@/lib/admin/totp";
 import { isAdminIpAllowed } from "@/lib/admin/ip-restrict";
+import { clientIpFromRequest, logLoginAttempt } from "@/lib/login-log";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -35,15 +36,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               tenantId: payload.tenantId,
               userType: "TENANT",
               isActive: true,
+              deletedAt: null,
             },
             include: { tenant: true, role: true },
           });
           if (!user?.tenant || user.tenant.status !== "ACTIVE") return null;
           if (user.tenant.loginBlocked) return null;
 
-          const permissions = Array.isArray(user.role?.permissions)
-            ? (user.role.permissions as string[])
-            : ["*"];
+          const { resolveUserPermissions } = await import("@/lib/permissions");
+          const permissions = resolveUserPermissions(
+            user.role?.permissions,
+            user.extraPermissions
+          );
 
           return {
             id: user.id,
@@ -109,27 +113,92 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const expectedSlug = (credentials.tenantSlug as string) || "";
 
         const user = await prisma.user.findFirst({
-          where: { email, userType: "TENANT", isActive: true },
+          where: {
+            email,
+            userType: "TENANT",
+            isActive: true,
+            deletedAt: null,
+          },
           include: {
             tenant: true,
             role: true,
           },
         });
 
-        if (!user || !user.tenant) return null;
-        if (user.tenant.status !== "ACTIVE") return null;
-        if (user.tenant.loginBlocked) return null;
+        const ip = request ? clientIpFromRequest(request) : null;
+        const userAgent = request?.headers.get("user-agent") ?? null;
+
+        if (!user || !user.tenant) {
+          await logLoginAttempt({
+            email,
+            success: false,
+            ip,
+            userAgent,
+          });
+          return null;
+        }
+        if (user.tenant.status !== "ACTIVE") {
+          await logLoginAttempt({
+            email,
+            success: false,
+            userId: user.id,
+            tenantId: user.tenantId,
+            ip,
+            userAgent,
+          });
+          return null;
+        }
+        if (user.tenant.loginBlocked) {
+          await logLoginAttempt({
+            email,
+            success: false,
+            userId: user.id,
+            tenantId: user.tenantId,
+            ip,
+            userAgent,
+          });
+          return null;
+        }
 
         if (expectedSlug && user.tenant.slug !== expectedSlug) {
+          await logLoginAttempt({
+            email,
+            success: false,
+            userId: user.id,
+            tenantId: user.tenantId,
+            ip,
+            userAgent,
+          });
           return null;
         }
 
         const valid = await bcrypt.compare(password, user.password);
-        if (!valid) return null;
+        if (!valid) {
+          await logLoginAttempt({
+            email,
+            success: false,
+            userId: user.id,
+            tenantId: user.tenantId,
+            ip,
+            userAgent,
+          });
+          return null;
+        }
 
-        const permissions = Array.isArray(user.role?.permissions)
-          ? (user.role.permissions as string[])
-          : [];
+        const { resolveUserPermissions } = await import("@/lib/permissions");
+        const permissions = resolveUserPermissions(
+          user.role?.permissions,
+          user.extraPermissions
+        );
+
+        await logLoginAttempt({
+          email: user.email,
+          success: true,
+          userId: user.id,
+          tenantId: user.tenantId,
+          ip,
+          userAgent,
+        });
 
         return {
           id: user.id,
@@ -142,24 +211,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           branchId: user.branchId,
           role: user.role?.name || "User",
           permissions,
+          mustChangePassword: user.mustChangePassword === true,
         };
       },
     }),
   ],
-  events: {
-    async signIn({ user }) {
-      try {
-        await prisma.loginLog.create({
-          data: {
-            email: user.email || "",
-            userId: user.id,
-            tenantId: user.tenantId || null,
-            success: true,
-          },
-        });
-      } catch {
-        /* ignore log failures */
-      }
-    },
-  },
 });

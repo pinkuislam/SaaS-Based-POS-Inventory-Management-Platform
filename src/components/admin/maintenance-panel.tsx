@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { maintenanceSchema } from "@/lib/schemas/forms";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormTextarea } from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -84,9 +84,7 @@ export function MaintenancePanel() {
               rows={4}
             />
           </FormField>
-          <Button type="submit" disabled={loading}>
-            {loading ? "Saving..." : "Save"}
-          </Button>
+          <SubmitButton loading={loading}>Save</SubmitButton>
         </form>
       </CardContent>
     </Card>

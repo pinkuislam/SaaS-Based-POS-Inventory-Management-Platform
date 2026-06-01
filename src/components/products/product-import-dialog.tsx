@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Upload, Download } from "lucide-react";
+import { ImportErrorReport } from "@/components/import-export/import-error-report";
 
 const SAMPLE_CSV = `name,sku,barcode,purchaseprice,sellingprice,stock,reorderlevel
 Sample Product,SKU-001,8901001001999,100,150,50,10`;
@@ -20,6 +21,7 @@ export function ProductImportDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function downloadTemplate() {
@@ -55,9 +57,11 @@ export function ProductImportDialog() {
         `Import done: ${data.created} created, ${data.updated} updated`
       );
       if (data.errors?.length) {
-        console.warn("Import errors:", data.errors);
+        setErrors(data.errors);
+      } else {
+        setOpen(false);
+        setErrors([]);
       }
-      setOpen(false);
       router.refresh();
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Import failed");
@@ -91,6 +95,7 @@ export function ProductImportDialog() {
             accept=".csv,text/csv"
             className="block w-full text-sm"
           />
+          <ImportErrorReport errors={errors} />
           <Button onClick={handleImport} className="w-full" disabled={loading}>
             {loading ? "Importing..." : "Import Products"}
           </Button>

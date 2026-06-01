@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { tenantUpdateSchema } from "@/lib/schemas/admin-tenant";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import {
@@ -243,9 +244,9 @@ export function TenantEditDialog({
               Block tenant login (users cannot sign in)
             </Label>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Saving..." : "Save Changes"}
-          </Button>
+          <SubmitButton loading={loading} className="w-full">
+            Save Changes
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

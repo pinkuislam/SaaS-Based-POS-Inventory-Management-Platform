@@ -6,6 +6,8 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { featureSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
+import { DialogActionOverlay } from "@/components/admin/dialog-action-overlay";
 import { FormField, FormInput } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -42,12 +44,18 @@ function buildInitial(feature?: Feature) {
 export function FeatureFormDialog({
   feature,
   mode = "create",
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: {
   feature?: Feature;
   mode?: "create" | "edit";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const [loading, setLoading] = useState(false);
   const { values: form, setField, validate, fieldError: fe } = useValidatedForm(
     buildInitial(feature),
@@ -91,24 +99,31 @@ export function FeatureFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!loading) setOpen(next);
+      }}
+    >
       {mode === "create" ? (
         <DialogTrigger render={<Button />}>
           <Plus className="mr-2 h-4 w-4" />
           Add Feature
         </DialogTrigger>
-      ) : (
+      ) : controlledOpen === undefined ? (
         <DialogTrigger render={<Button size="icon" variant="ghost" />}>
           <Pencil className="h-4 w-4" />
         </DialogTrigger>
-      )}
-      <DialogContent>
+      ) : null}
+      <DialogContent className="relative">
+        <DialogActionOverlay loading={loading} />
         <DialogHeader>
           <DialogTitle>
             {mode === "create" ? "Add Feature" : "Edit Feature"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
+          <fieldset disabled={loading} className="space-y-4 border-0 p-0 m-0 min-w-0">
           <FormField
             label="Feature Key"
             htmlFor="key"
@@ -164,9 +179,14 @@ export function FeatureFormDialog({
             />
             <Label htmlFor="isActive">Active</Label>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            Save
-          </Button>
+          </fieldset>
+          <SubmitButton
+            loading={loading}
+            loadingText={mode === "create" ? "Creating..." : "Updating..."}
+            className="w-full"
+          >
+            {mode === "create" ? "Create Feature" : "Update Feature"}
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

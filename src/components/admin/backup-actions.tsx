@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { confirmDelete } from "@/lib/confirm";
-import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
+import { ActionIconButton } from "@/components/admin/loading-button";
+import { Button } from "@/components/ui/button";
 
 export function BackupActions({
   backupId,
@@ -15,6 +17,7 @@ export function BackupActions({
   canDownload: boolean;
 }) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   async function remove() {
     const confirmed = await confirmDelete(
@@ -23,15 +26,20 @@ export function BackupActions({
     );
     if (!confirmed) return;
 
-    const res = await fetch(`/api/admin/databases/backups/${backupId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      notify.success("Backup deleted");
-      router.refresh();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      notify.error(typeof data.error === "string" ? data.error : "Delete failed");
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/databases/backups/${backupId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        notify.success("Backup deleted");
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        notify.error(typeof data.error === "string" ? data.error : "Delete failed");
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -45,9 +53,15 @@ export function BackupActions({
           </Button>
         </Link>
       ) : null}
-      <Button size="sm" variant="ghost" onClick={remove}>
+      <ActionIconButton
+        size="sm"
+        variant="ghost"
+        loading={loading}
+        onClick={remove}
+        aria-label="Delete backup"
+      >
         <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
+      </ActionIconButton>
     </div>
   );
 }

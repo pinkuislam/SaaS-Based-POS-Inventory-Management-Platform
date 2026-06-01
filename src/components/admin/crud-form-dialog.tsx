@@ -9,6 +9,8 @@ import {
 } from "@/lib/validate-form";
 import type { ZodType } from "zod";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
+import { DialogActionOverlay } from "@/components/admin/dialog-action-overlay";
 import {
   Dialog,
   DialogContent,
@@ -94,7 +96,12 @@ export function CrudFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!loading) setOpen(next);
+      }}
+    >
       {mode === "create" ? (
         <DialogTrigger render={<Button size="sm" />}>
           <Plus className="mr-2 h-4 w-4" />
@@ -105,15 +112,18 @@ export function CrudFormDialog({
           <Pencil className="h-4 w-4" />
         </DialogTrigger>
       )}
-      <DialogContent>
+      <DialogContent className="relative">
+        <DialogActionOverlay loading={loading} />
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
-          {children({ form, setForm, errors, clearError })}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Saving..." : "Save"}
-          </Button>
+          <fieldset disabled={loading} className="space-y-4 border-0 p-0 m-0 min-w-0">
+            {children({ form, setForm, errors, clearError })}
+          </fieldset>
+          <SubmitButton loading={loading} className="w-full">
+            Save
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

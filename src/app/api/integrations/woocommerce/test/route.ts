@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { testWooCommerceConnection } from "@/lib/woocommerce";
+import { ecommerceSettingKey } from "@/lib/ecommerce-platform";
 
 export async function POST(request: Request) {
   const authResult = await requirePermission("manage_settings");
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
 
   if (!config.storeUrl && body.useSaved) {
     const saved = await prisma.ecommerceSetting.findUnique({
-      where: { tenantId },
+      where: ecommerceSettingKey(tenantId, "woocommerce"),
     });
     if (!saved) {
       return NextResponse.json({ error: "No saved settings" }, { status: 400 });

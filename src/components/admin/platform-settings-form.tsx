@@ -5,6 +5,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { platformSettingsSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput } from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLATFORM_SETTING_KEYS } from "@/lib/admin/platform-setting-keys";
@@ -224,9 +225,9 @@ export function PlatformSettingsForm() {
                 onChange={(e) => setField(K.privacyUrl, e.target.value)}
               />
             </FormField>
-            <Button type="submit" disabled={loading} className="md:col-span-2">
-              {loading ? "Saving..." : "Save Platform Settings"}
-            </Button>
+            <SubmitButton loading={loading} className="md:col-span-2">
+              Save Platform Settings
+            </SubmitButton>
           </CardContent>
         </Card>
       </form>

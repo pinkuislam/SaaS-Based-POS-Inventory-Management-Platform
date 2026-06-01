@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   const tenantId = session.user.tenantId;
   const body = await request.json();
-  const { type, name, shortName } = body;
+  const { type, name, code, shortName, parentId } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -47,20 +47,34 @@ export async function POST(request: Request) {
 
   if (type === "brand") {
     const brand = await prisma.brand.create({
-      data: { tenantId, name: name.trim() },
+      data: {
+        tenantId,
+        name: name.trim(),
+        description: body.description?.trim() || null,
+      },
     });
     return NextResponse.json(brand);
   }
 
   if (type === "unit") {
     const unit = await prisma.unit.create({
-      data: { tenantId, name: name.trim(), shortName: shortName?.trim() },
+      data: {
+        tenantId,
+        name: name.trim(),
+        shortName: shortName?.trim(),
+        unitType: body.unitType?.trim() || null,
+      },
     });
     return NextResponse.json(unit);
   }
 
   const category = await prisma.productCategory.create({
-    data: { tenantId, name: name.trim() },
+    data: {
+      tenantId,
+      name: name.trim(),
+      code: code?.trim() || null,
+      parentId: parentId || null,
+    },
   });
   return NextResponse.json(category);
 }

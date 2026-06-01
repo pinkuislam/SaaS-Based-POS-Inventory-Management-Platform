@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { confirmDelete } from "@/lib/confirm";
-import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import { ActionButton, ActionIconButton } from "@/components/admin/loading-button";
 
 export function DeleteButton({
   url,
@@ -18,36 +19,48 @@ export function DeleteButton({
   successMessage?: string;
 }) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   async function remove() {
     const confirmed = await confirmDelete(confirmTitle, confirmMessage);
     if (!confirmed) return;
 
-    const res = await fetch(url, {
-      method: "DELETE",
-      credentials: "same-origin",
-    });
-    if (res.ok) {
-      notify.success(successMessage);
-      router.refresh();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      const fallback =
-        res.status === 401
-          ? "Session expired — sign in again"
-          : res.status === 403
-            ? "Not allowed"
-            : "Delete failed";
-      notify.error(
-        typeof data.error === "string" ? data.error : fallback
-      );
+    setLoading(true);
+    try {
+      const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (res.ok) {
+        notify.success(successMessage);
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const fallback =
+          res.status === 401
+            ? "Session expired — sign in again"
+            : res.status === 403
+              ? "Not allowed"
+              : "Delete failed";
+        notify.error(
+          typeof data.error === "string" ? data.error : fallback
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <Button size="icon" variant="ghost" onClick={remove}>
+    <ActionIconButton
+      size="icon"
+      variant="ghost"
+      loading={loading}
+      onClick={remove}
+      aria-label="Delete"
+    >
       <Trash2 className="h-4 w-4 text-destructive" />
-    </Button>
+    </ActionIconButton>
   );
 }
 
@@ -63,24 +76,36 @@ export function StatusToggleButton({
   label: string;
 }) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   async function toggle() {
-    const res = await fetch(url, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
-    });
-    if (res.ok) {
-      notify.success("Updated successfully");
-      router.refresh();
-    } else {
-      notify.error("Update failed");
+    setLoading(true);
+    try {
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (res.ok) {
+        notify.success("Updated successfully");
+        router.refresh();
+      } else {
+        notify.error("Update failed");
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <Button size="sm" variant="outline" onClick={toggle}>
+    <ActionButton
+      size="sm"
+      variant="outline"
+      loading={loading}
+      loadingText="Updating..."
+      onClick={toggle}
+    >
       {label}
-    </Button>
+    </ActionButton>
   );
 }

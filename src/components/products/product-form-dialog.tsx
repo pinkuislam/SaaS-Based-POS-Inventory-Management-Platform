@@ -43,6 +43,8 @@ export function ProductFormDialog({
       name: "",
       sku: "",
       barcode: "",
+      serialNo: "",
+      taxRate: "0",
       categoryId: "",
       brandId: "",
       unitId: "",
@@ -85,6 +87,8 @@ export function ProductFormDialog({
           expiryDate: data.expiryDate || null,
           stockQty: parseFloat(data.stockQty || "0") || 0,
           reorderLevel: parseFloat(data.reorderLevel || "0") || 0,
+          taxRate: parseFloat(data.taxRate || "0") || 0,
+          serialNo: data.serialNo || null,
           categoryId: data.categoryId || null,
           brandId: data.brandId || null,
           unitId: data.unitId || null,
@@ -150,6 +154,13 @@ export function ProductFormDialog({
                 onChange={(e) => setField("barcode", e.target.value)}
               />
             </FormField>
+            <FormField label="Serial No." htmlFor="serialNo">
+              <FormInput
+                id="serialNo"
+                value={values.serialNo}
+                onChange={(e) => setField("serialNo", e.target.value)}
+              />
+            </FormField>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <FormSelect2
@@ -213,6 +224,15 @@ export function ProductFormDialog({
               />
             </FormField>
           </div>
+          <FormField label="Tax / VAT %" htmlFor="taxRate">
+            <FormInput
+              id="taxRate"
+              type="number"
+              step="0.01"
+              value={values.taxRate}
+              onChange={(e) => setField("taxRate", e.target.value)}
+            />
+          </FormField>
           <div className="grid grid-cols-3 gap-4">
             <FormField
               label="Wholesale Price"

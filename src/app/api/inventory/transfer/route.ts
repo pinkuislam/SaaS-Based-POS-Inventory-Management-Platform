@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decimalToNumber } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -117,6 +118,15 @@ export async function POST(request: Request) {
     });
 
     return { reference: ref, targetProductId: targetProduct.id };
+  });
+
+  await logActivity({
+    tenantId,
+    userId: session.user.id,
+    userName: session.user.name || undefined,
+    action: "stock_transfer",
+    module: "inventory",
+    details: `Transfer ${quantity} units — ref ${result.reference}`,
   });
 
   return NextResponse.json(result);

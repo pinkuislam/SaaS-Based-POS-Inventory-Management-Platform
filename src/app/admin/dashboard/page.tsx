@@ -28,7 +28,6 @@ import {
 import { RevenueChart } from "@/components/admin/revenue-chart";
 import { decimalToNumber } from "@/lib/utils";
 import { HeadphonesIcon } from "lucide-react";
-import { AdminModulesOverview } from "@/components/admin/admin-modules-overview";
 
 export default async function AdminDashboardPage() {
   const [stats, recentTenants] = await Promise.all([
@@ -207,8 +206,6 @@ export default async function AdminDashboardPage() {
           </Table>
         </CardContent>
       </Card>
-
-      <AdminModulesOverview />
     </div>
   );
 }

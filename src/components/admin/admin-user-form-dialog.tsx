@@ -9,6 +9,7 @@ import {
   adminUserUpdateSchema,
 } from "@/lib/schemas/admin-user";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -196,9 +197,9 @@ export function AdminUserFormDialog({
               <Label htmlFor="isActive">Active</Label>
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
+          <SubmitButton loading={loading} className="w-full">
             Save
-          </Button>
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

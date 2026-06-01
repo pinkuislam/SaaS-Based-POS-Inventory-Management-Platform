@@ -1,64 +1,75 @@
-import { getTenantId } from "@/lib/tenant";
+import { Suspense } from "react";
+import { getTenantId, getTenantSlug } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { BranchFormDialog } from "@/components/branches/branch-form-dialog";
+import { BranchesTable } from "@/components/branches/branches-table";
+import { ShowArchivedBranches } from "@/components/branches/show-archived-branches";
+import { activeBranchWhere, parseBranchSettings } from "@/lib/branches";
+import { decimalToNumber } from "@/lib/utils";
 
-export default async function BranchesPage() {
+export default async function BranchesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
   const tenantId = await getTenantId();
+  const tenantSlug = await getTenantSlug();
+  const { show } = await searchParams;
+  const showAll = show === "all";
+
   const branches = await prisma.branch.findMany({
-    where: { tenantId },
-    include: { _count: { select: { users: true } } },
+    where: showAll
+      ? { tenantId }
+      : { ...activeBranchWhere(tenantId), isActive: true },
+    include: {
+      manager: { select: { name: true } },
+      _count: { select: { users: true } },
+    },
+    orderBy: [{ isMain: "desc" }, { name: "asc" }],
   });
+
+  const rows = branches.map((b) => ({
+    id: b.id,
+    name: b.name,
+    code: b.code,
+    address: b.address,
+    contactPerson: b.contactPerson,
+    phone: b.phone,
+    email: b.email,
+    openingBalance:
+      b.openingBalance != null ? decimalToNumber(b.openingBalance) : null,
+    managerId: b.managerId,
+    managerName: b.manager?.name ?? null,
+    isMain: b.isMain,
+    isActive: b.isActive,
+    deletedAt: b.deletedAt?.toISOString() ?? null,
+    userCount: b._count.users,
+    settings: parseBranchSettings(b.settings),
+  }));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Branches</h1>
-        <p className="text-muted-foreground">Multi-branch management</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Branches</h1>
+          <p className="text-muted-foreground">
+            Multi-branch management — create, view, and manage locations
+          </p>
+        </div>
+        <BranchFormDialog />
       </div>
+
+      <Suspense fallback={null}>
+        <ShowArchivedBranches tenantSlug={tenantSlug} />
+      </Suspense>
+
       <Card>
         <CardHeader>
           <CardTitle>Branch List</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Users</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {branches.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-medium">{b.name}</TableCell>
-                  <TableCell>{b.code || "—"}</TableCell>
-                  <TableCell>{b.phone || "—"}</TableCell>
-                  <TableCell>{b._count.users}</TableCell>
-                  <TableCell>
-                    {b.isMain && <Badge>Main</Badge>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={b.isActive ? "default" : "secondary"}>
-                      {b.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <BranchesTable tenantSlug={tenantSlug} branches={rows} />
         </CardContent>
       </Card>
     </div>

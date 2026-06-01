@@ -13,10 +13,10 @@ export async function GET(request: Request) {
   const search = searchParams.get("search") || "";
   const tenantId = session.user.tenantId;
 
+  const { activeProductWhere } = await import("@/lib/products");
   const products = await prisma.product.findMany({
     where: {
-      tenantId,
-      status: "ACTIVE",
+      ...activeProductWhere(tenantId),
       OR: search
         ? [
             { name: { contains: search } },
@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       reorderLevel: body.reorderLevel || 0,
       description: body.description,
       batchNo: body.batchNo || null,
+      serialNo: body.serialNo?.trim() || null,
       expiryDate: body.expiryDate ? new Date(body.expiryDate) : null,
     },
   });

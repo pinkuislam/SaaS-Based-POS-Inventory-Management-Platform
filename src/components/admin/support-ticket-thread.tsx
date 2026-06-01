@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { supportReplySchema } from "@/lib/schemas/forms";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormTextarea, FormSelect2 } from "@/components/ui/form-field";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -209,9 +209,9 @@ export function SupportTicketThread({
               />
               Internal note (not visible to tenant)
             </label>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Sending..." : "Send reply & update"}
-            </Button>
+            <SubmitButton loading={loading} loadingText="Sending...">
+              Send reply & update
+            </SubmitButton>
           </form>
         </CardContent>
       </Card>

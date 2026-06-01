@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -14,11 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Settings2 } from "lucide-react";
-import {
-  ALL_PERMISSIONS,
-  PERMISSION_LABELS,
-  type Permission,
-} from "@/lib/permissions";
+import { PermissionPicker } from "@/components/permissions/permission-picker";
 
 export function RolePermissionEditor({
   roleId,
@@ -37,12 +31,6 @@ export function RolePermissionEditor({
   const [selected, setSelected] = useState<string[]>(permissions);
 
   const isOwner = roleName === "Owner" && isDefault;
-
-  function toggle(perm: Permission) {
-    setSelected((prev) =>
-      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
-    );
-  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -82,29 +70,14 @@ export function RolePermissionEditor({
         }
       >
         <Settings2 className="h-3 w-3" />
-        Edit
+        Permissions
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Permissions — {roleName}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSave} className="space-y-4" noValidate>
-          <div className="space-y-3 py-2">
-            {ALL_PERMISSIONS.map((perm) => (
-              <label
-                key={perm}
-                className="flex items-center gap-3 text-sm cursor-pointer"
-              >
-                <Checkbox
-                  checked={selected.includes(perm)}
-                  onCheckedChange={() => toggle(perm)}
-                />
-                <Label className="cursor-pointer font-normal">
-                  {PERMISSION_LABELS[perm]}
-                </Label>
-              </label>
-            ))}
-          </div>
+          <PermissionPicker selected={selected} onChange={setSelected} />
           <div className="flex gap-2">
             <Button
               type="button"
@@ -115,7 +88,7 @@ export function RolePermissionEditor({
               Reset
             </Button>
             <Button type="submit" className="flex-1" disabled={loading}>
-              {loading ? "Saving..." : "Save Permissions"}
+              {loading ? "Saving..." : "Save"}
             </Button>
           </div>
         </form>

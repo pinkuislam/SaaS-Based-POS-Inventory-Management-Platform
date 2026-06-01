@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requirePermission } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { logActivity } from "@/lib/activity-log";
+import { filterValidPermissions } from "@/lib/permissions";
 import bcrypt from "bcryptjs";
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(request: Request) {
+  const authResult = await requirePermission("manage_users");
+  if ("error" in authResult) return authResult.error;
+
+  const tenantId = authResult.session.user.tenantId!;
+  const { searchParams } = new URL(request.url);
+  const includeDeleted = searchParams.get("includeDeleted") === "1";
 
   const users = await prisma.user.findMany({
-    where: { tenantId: session.user.tenantId },
+    where: {
+      tenantId,
+      ...(includeDeleted ? {} : { deletedAt: null }),
+    },
     include: { role: true, branch: true },
     orderBy: { name: "asc" },
   });
@@ -19,14 +26,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requirePermission("manage_users");
+  if ("error" in authResult) return authResult.error;
 
-  const tenantId = session.user.tenantId;
+  const tenantId = authResult.session.user.tenantId!;
   const body = await request.json();
-  const { name, email, password, roleId, branchId, phone } = body;
+  const {
+    name,
+    email,
+    password,
+    roleId,
+    branchId,
+    phone,
+    isActive,
+    extraPermissions,
+  } = body;
 
   if (!name?.trim() || !email?.trim() || !password) {
     return NextResponse.json(
@@ -50,7 +64,9 @@ export async function POST(request: Request) {
     include: { package: true },
   });
 
-  const userCount = await prisma.user.count({ where: { tenantId } });
+  const userCount = await prisma.user.count({
+    where: { tenantId, deletedAt: null },
+  });
   const maxUsers = tenant?.package?.maxUsers ?? 10;
   if (userCount >= maxUsers) {
     return NextResponse.json(
@@ -60,6 +76,7 @@ export async function POST(request: Request) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const validExtra = filterValidPermissions(extraPermissions);
 
   const user = await prisma.user.create({
     data: {
@@ -69,11 +86,21 @@ export async function POST(request: Request) {
       password: hashedPassword,
       roleId: roleId || null,
       branchId: branchId || null,
-      phone,
+      phone: phone?.trim() || null,
       userType: "TENANT",
-      isActive: true,
+      isActive: isActive !== false,
+      extraPermissions: validExtra.length > 0 ? validExtra : undefined,
     },
     include: { role: true, branch: true },
+  });
+
+  await logActivity({
+    tenantId,
+    userId: authResult.session.user.id,
+    userName: authResult.session.user.name || undefined,
+    action: "create",
+    module: "users",
+    details: `Created user ${user.email}`,
   });
 
   return NextResponse.json({

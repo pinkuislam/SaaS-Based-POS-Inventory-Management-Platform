@@ -11,6 +11,7 @@ declare module "next-auth" {
     permissions?: string[];
     impersonatedBy?: string;
     impersonatedByName?: string;
+    mustChangePassword?: boolean;
   }
 
   interface Session {
@@ -25,6 +26,7 @@ declare module "next-auth" {
       permissions?: string[];
       impersonatedBy?: string;
       impersonatedByName?: string;
+      mustChangePassword?: boolean;
     };
   }
 }
@@ -40,5 +42,6 @@ declare module "next-auth/jwt" {
     permissions?: string[];
     impersonatedBy?: string;
     impersonatedByName?: string;
+    mustChangePassword?: boolean;
   }
 }

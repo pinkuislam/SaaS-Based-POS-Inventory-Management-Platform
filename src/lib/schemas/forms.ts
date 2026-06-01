@@ -40,6 +40,17 @@ export const resetPasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string().min(1, "Confirm your password"),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const customerSchema = z.object({
   name: z.string().min(1, "Customer name is required"),
   phone: optStr,
@@ -77,11 +88,24 @@ export const branchSchema = z.object({
   name: z.string().min(1, "Branch name is required"),
   code: optStr,
   address: optStr,
+  contactPerson: optStr,
   phone: optStr,
+  email: z.union([z.literal(""), z.string().email("Enter a valid email")]).optional(),
+  openingBalance: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || (!Number.isNaN(parseFloat(v)) && parseFloat(v) >= 0),
+      "Enter a valid opening balance"
+    ),
+  managerId: optStr,
+  isActive: z.boolean().optional(),
 });
 
 export const branchFormSchema = branchSchema.extend({
   isMain: z.boolean().optional(),
+  invoicePrefix: optStr,
+  settingsNotes: optStr,
 });
 
 export const userSchema = z.object({
@@ -305,7 +329,9 @@ export const stockAdjustFormSchema = z.object({
     .string()
     .min(1, "Quantity is required")
     .refine((v) => parseFloat(v) > 0, "Enter a valid quantity"),
-  type: z.string().min(1, "Select adjustment type"),
+  direction: z.string().min(1),
+  adjustType: z.string().min(1),
+  reason: optStr,
   note: optStr,
 });
 
@@ -363,16 +389,36 @@ export const tenantProfileFormSchema = z.object({
   valuePerPoint: optStr,
 });
 
+export const businessProfileSchema = z.object({
+  name: z.string().min(1, "Business name is required"),
+  ownerName: z.string().min(1, "Owner name is required"),
+  email: z.string().email("Enter a valid business email"),
+  phone: optStr,
+  address: optStr,
+  taxVatNumber: optStr,
+  businessType: z.string().min(1, "Select business type"),
+  invoicePrefix: z.string().min(1, "Invoice prefix is required").max(12),
+  currency: z.string().min(1, "Select currency"),
+  timezone: z.string().min(1, "Select timezone"),
+});
+
+export const accountDeletionRequestSchema = z.object({
+  reason: z.string().min(10, "Please provide a reason (at least 10 characters)"),
+  confirmName: z.string().min(1, "Type your business name to confirm"),
+});
+
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required"),
   sku: optStr,
   barcode: optStr,
+  serialNo: optStr,
   categoryId: optStr,
   brandId: optStr,
   unitId: optStr,
   purchasePrice: optStr,
   sellingPrice: z.string().min(1, "Selling price is required"),
   wholesalePrice: optStr,
+  taxRate: optStr,
   batchNo: optStr,
   expiryDate: optStr,
   stockQty: optStr,
@@ -388,6 +434,7 @@ export const productEditSchema = productSchema.omit({
 
 export const categoryItemSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  code: optStr,
   shortName: optStr,
 });
 
@@ -407,6 +454,29 @@ export const woocommerceSchema = z.object({
   syncProducts: z.boolean().optional(),
   syncStock: z.boolean().optional(),
   syncOrders: z.boolean().optional(),
+  syncCustomers: z.boolean().optional(),
+  syncDirection: z.enum(["inbound", "outbound", "both"]).optional(),
+  webhookSecret: optStr,
+});
+
+export const shopifySchema = z.object({
+  storeUrl: z
+    .string()
+    .min(1, "Store URL is required")
+    .refine(
+      (v) =>
+        /^https?:\/\/.+\.myshopify\.com\/?$/i.test(v.trim()) ||
+        /^[\w-]+\.myshopify\.com\/?$/i.test(v.trim()),
+      "Enter your Shopify store URL (e.g. your-store.myshopify.com)"
+    ),
+  accessToken: optStr,
+  isActive: z.boolean().optional(),
+  syncProducts: z.boolean().optional(),
+  syncStock: z.boolean().optional(),
+  syncOrders: z.boolean().optional(),
+  syncCustomers: z.boolean().optional(),
+  syncDirection: z.enum(["inbound", "outbound", "both"]).optional(),
+  webhookSecret: optStr,
 });
 
 export const saleReturnSchema = z.object({

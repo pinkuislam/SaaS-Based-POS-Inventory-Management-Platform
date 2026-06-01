@@ -37,6 +37,8 @@ export const API_ROUTE_PERMISSIONS: {
   { method: "PATCH", pattern: /^\/api\/roles/, permission: "manage_users" },
   { method: "GET", pattern: /^\/api\/branches/, permission: "manage_branches" },
   { method: "POST", pattern: /^\/api\/branches/, permission: "manage_branches" },
+  { method: "PATCH", pattern: /^\/api\/branches/, permission: "manage_branches" },
+  { method: "DELETE", pattern: /^\/api\/branches/, permission: "manage_branches" },
   { method: "POST", pattern: /^\/api\/categories/, permission: "manage_products" },
   { method: "POST", pattern: /^\/api\/support/, permission: "manage_settings" },
 ];

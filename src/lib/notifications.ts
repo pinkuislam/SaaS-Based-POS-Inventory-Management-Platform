@@ -1,8 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { decimalToNumber } from "@/lib/utils";
 import { sendLowStockAlertEmail, isEmailConfigured } from "@/lib/email";
+import { getTenantSettings } from "@/lib/tenant-settings";
 
 export async function syncLowStockNotifications(tenantId: string) {
+  const settings = await getTenantSettings(tenantId);
+  const stockPrefs = settings.stock ?? {};
+  if (stockPrefs.lowStockAlertEnabled === false) return;
+
+  const dedupHours = stockPrefs.lowStockDedupHours ?? 24;
+  const dedupMs = dedupHours * 60 * 60 * 1000;
   const lowStockProducts = await prisma.product.findMany({
     where: { tenantId, status: "ACTIVE" },
   });
@@ -16,7 +23,7 @@ export async function syncLowStockNotifications(tenantId: string) {
       tenantId,
       type: "low_stock",
       isRead: false,
-      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      createdAt: { gte: new Date(Date.now() - dedupMs) },
     },
   });
 
@@ -36,12 +43,18 @@ export async function syncLowStockNotifications(tenantId: string) {
     select: { name: true, email: true },
   });
 
-  if ((await isEmailConfigured()) && tenant?.email && lowStock.length > 0) {
+  const notifPrefs = settings.notifications ?? {};
+  if (
+    notifPrefs.emailLowStock !== false &&
+    (await isEmailConfigured()) &&
+    tenant?.email &&
+    lowStock.length > 0
+  ) {
     const emailedToday = await prisma.notification.findFirst({
       where: {
         tenantId,
         type: "low_stock_email",
-        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        createdAt: { gte: new Date(Date.now() - dedupMs) },
       },
     });
     if (!emailedToday) {

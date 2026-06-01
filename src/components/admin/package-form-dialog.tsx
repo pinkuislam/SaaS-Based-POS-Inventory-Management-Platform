@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { packageSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import {
   FormField,
   FormInput,
@@ -362,9 +363,13 @@ export function PackageFormDialog({
               Mark as popular
             </label>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Saving..." : mode === "edit" ? "Update" : "Create"}
-          </Button>
+          <SubmitButton
+            loading={loading}
+            loadingText={mode === "edit" ? "Updating..." : "Creating..."}
+            className="w-full"
+          >
+            {mode === "edit" ? "Update" : "Create"}
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

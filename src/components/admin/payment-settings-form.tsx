@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { paymentSettingsSchema } from "@/lib/schemas/forms";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -211,9 +211,9 @@ export function PaymentSettingsForm() {
         className="max-w-xs"
       />
 
-      <Button type="submit" disabled={loading}>
-        {loading ? "Saving..." : "Save Payment Settings"}
-      </Button>
+      <SubmitButton loading={loading}>
+        Save Payment Settings
+      </SubmitButton>
     </form>
   );
 }

@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:push": "prisma db push",
+    "db:sync": "prisma db push && prisma generate",
+    "dev:clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\" && next dev",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"

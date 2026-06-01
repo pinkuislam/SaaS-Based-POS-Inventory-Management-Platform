@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { securityIpSchema } from "@/lib/schemas/forms";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormTextarea } from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLATFORM_SETTING_KEYS } from "@/lib/admin/platform-setting-keys";
@@ -71,9 +71,7 @@ export function SecurityIpPanel() {
               placeholder="127.0.0.1&#10;192.168.1.*"
             />
           </FormField>
-          <Button type="submit" disabled={loading}>
-            Save IP rules
-          </Button>
+          <SubmitButton loading={loading}>Save IP rules</SubmitButton>
         </form>
       </CardContent>
     </Card>

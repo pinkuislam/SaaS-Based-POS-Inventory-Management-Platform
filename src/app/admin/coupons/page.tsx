@@ -1,28 +1,20 @@
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate, decimalToNumber } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
 import { serializeCoupon } from "@/lib/serialize";
 import { CouponFormDialog } from "@/components/admin/coupon-form-dialog";
-import { DeleteButton } from "@/components/admin/simple-crud-actions";
+import { CouponsList } from "@/components/admin/lists/coupons-list";
 
 export default async function CouponsPage() {
-  const coupons = await prisma.coupon.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { package: { select: { name: true } } },
-  });
-  const packages = await prisma.subscriptionPackage.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true },
-  });
+  const [coupons, packages] = await Promise.all([
+    prisma.coupon.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { package: { select: { name: true } } },
+    }),
+    prisma.subscriptionPackage.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -35,50 +27,10 @@ export default async function CouponsPage() {
       </div>
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Package</TableHead>
-                <TableHead>Used</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coupons.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono font-medium">{c.code}</TableCell>
-                  <TableCell>{c.discountType}</TableCell>
-                  <TableCell>{decimalToNumber(c.discountValue)}</TableCell>
-                  <TableCell>{c.package?.name || "All"}</TableCell>
-                  <TableCell>
-                    {c.usedCount}
-                    {c.usageLimit ? ` / ${c.usageLimit}` : ""}
-                  </TableCell>
-                  <TableCell>
-                    {c.expiryDate ? formatDate(c.expiryDate) : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={c.isActive ? "default" : "secondary"}>
-                      {c.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="flex gap-1">
-                    <CouponFormDialog
-                      packages={packages}
-                      coupon={serializeCoupon(c)}
-                      mode="edit"
-                    />
-                    <DeleteButton url={`/api/admin/coupons/${c.id}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <CouponsList
+            coupons={coupons.map(serializeCoupon)}
+            packages={packages}
+          />
         </CardContent>
       </Card>
     </div>

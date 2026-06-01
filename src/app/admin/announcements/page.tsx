@@ -1,22 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
 import { AnnouncementFormDialog } from "@/components/admin/announcement-form-dialog";
-import { DeleteButton } from "@/components/admin/simple-crud-actions";
+import { AnnouncementsList } from "@/components/admin/lists/announcements-list";
 
 export default async function AnnouncementsPage() {
   const items = await prisma.platformAnnouncement.findMany({
     orderBy: { createdAt: "desc" },
   });
+
+  const rows = items.map((a) => ({
+    id: a.id,
+    title: a.title,
+    content: a.content,
+    targetType: a.targetType,
+    status: a.status,
+    publishedAt: a.publishedAt?.toISOString() ?? null,
+  }));
 
   return (
     <div className="space-y-6">
@@ -29,33 +28,7 @@ export default async function AnnouncementsPage() {
       </div>
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Published</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.title}</TableCell>
-                  <TableCell>
-                    <Badge>{a.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {a.publishedAt ? formatDate(a.publishedAt) : "—"}
-                  </TableCell>
-                  <TableCell className="flex gap-1">
-                    <AnnouncementFormDialog announcement={a} mode="edit" />
-                    <DeleteButton url={`/api/admin/announcements/${a.id}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <AnnouncementsList items={rows} />
         </CardContent>
       </Card>
     </div>

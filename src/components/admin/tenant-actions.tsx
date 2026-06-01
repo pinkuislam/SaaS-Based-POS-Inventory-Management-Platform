@@ -15,7 +15,7 @@ import {
   TenantEditDialog,
   type TenantEditData,
 } from "@/components/admin/tenant-edit-dialog";
-import { MoreHorizontal, Pencil } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil } from "lucide-react";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -109,7 +109,11 @@ export function TenantActions({
           disabled={busy}
           className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 w-8 disabled:opacity-50"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          {busy ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <MoreHorizontal className="h-4 w-4" />
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {tenant && packages.length > 0 && (

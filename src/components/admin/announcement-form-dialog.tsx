@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { announcementSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import {
   FormField,
   FormInput,
@@ -163,9 +164,9 @@ export function AnnouncementFormDialog({
             />
             Publish immediately
           </label>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <SubmitButton loading={loading} className="w-full">
             Save
-          </Button>
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

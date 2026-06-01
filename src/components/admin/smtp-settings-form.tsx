@@ -5,6 +5,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { smtpSettingsSchema, smtpTestSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -205,9 +206,9 @@ export function SmtpSettingsForm() {
             Use TLS/SSL (port 465)
           </label>
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save SMTP Settings"}
-            </Button>
+            <SubmitButton loading={loading}>
+              Save SMTP Settings
+            </SubmitButton>
           </div>
         </form>
 

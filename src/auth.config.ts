@@ -23,6 +23,7 @@ export const authConfig = {
         token.permissions = user.permissions;
         token.impersonatedBy = user.impersonatedBy;
         token.impersonatedByName = user.impersonatedByName;
+        token.mustChangePassword = user.mustChangePassword;
       }
       return token;
     },
@@ -39,6 +40,9 @@ export const authConfig = {
         session.user.impersonatedBy = token.impersonatedBy as string | undefined;
         session.user.impersonatedByName = token.impersonatedByName as
           | string
+          | undefined;
+        session.user.mustChangePassword = token.mustChangePassword as
+          | boolean
           | undefined;
       }
       return session;

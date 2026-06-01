@@ -2,6 +2,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { ReportsOverviewLinks } from "@/components/reports/reports-overview-links";
 import { formatCurrency, decimalToNumber } from "@/lib/utils";
 import { DollarSign, ShoppingBag, TrendingUp, Package } from "lucide-react";
 import { ReportsChart } from "@/components/reports/reports-chart";
@@ -12,7 +13,12 @@ export default async function ReportsPage() {
   const monthStart = startOfMonth(new Date());
   const monthEnd = endOfMonth(new Date());
 
-  const [monthSales, monthPurchases, products, salesByDay] = await Promise.all([
+  const [
+    monthSales,
+    monthPurchases,
+    products,
+    salesByDay,
+  ] = await Promise.all([
     prisma.sale.aggregate({
       where: {
         tenantId,
@@ -32,7 +38,7 @@ export default async function ReportsPage() {
     }),
     prisma.product.findMany({
       where: { tenantId },
-      select: { stockQty: true, purchasePrice: true, sellingPrice: true },
+      select: { stockQty: true, purchasePrice: true },
     }),
     prisma.sale.findMany({
       where: {
@@ -50,14 +56,13 @@ export default async function ReportsPage() {
     (s, p) => s + decimalToNumber(p.stockQty) * decimalToNumber(p.purchasePrice),
     0
   );
-  const estimatedProfit = salesTotal - purchasesTotal;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Reports</h1>
         <p className="text-muted-foreground">
-          Business analytics for this month
+          Business analytics and exportable reports
         </p>
       </div>
 
@@ -76,7 +81,7 @@ export default async function ReportsPage() {
         />
         <StatCard
           title="Est. Profit"
-          value={formatCurrency(estimatedProfit)}
+          value={formatCurrency(salesTotal - purchasesTotal)}
           icon={TrendingUp}
         />
         <StatCard
@@ -95,43 +100,7 @@ export default async function ReportsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {[
-                "Sales Report",
-                "Purchase Report",
-                "Stock Report",
-                "Low Stock Report",
-                "Product-wise Sales",
-                "Customer Due Report",
-                "Supplier Due Report",
-                "Profit & Loss",
-                "Payment Method Report",
-              ].map((r) => (
-                <li key={r} className="flex items-center gap-2">
-                  <span className="text-primary">•</span> {r}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Export Options</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              PDF and Excel export can be integrated using libraries like
-              jsPDF, xlsx, or server-side report generation.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <ReportsOverviewLinks />
     </div>
   );
 }

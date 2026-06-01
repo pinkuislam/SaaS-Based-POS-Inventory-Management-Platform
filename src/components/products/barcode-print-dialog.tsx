@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import JsBarcode from "jsbarcode";
+import { useRef, useState } from "react";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { barcodePrintSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
-import { FormField, FormInput } from "@/components/ui/form-field";
+import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -14,51 +15,43 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Barcode } from "lucide-react";
-import type { SerializedProductClient } from "@/lib/serialize";
+import {
+  BarcodeLabelBlock,
+  buildBarcodePrintHtml,
+  type BarcodeProduct,
+} from "@/components/barcode/barcode-label-preview";
+import {
+  DEFAULT_LABEL_OPTIONS,
+  generateBarcodeValue,
+  type BarcodeFormat,
+  type BarcodeLabelOptions,
+  type LabelSize,
+} from "@/lib/barcode-label";
 
 export function BarcodePrintDialog({
   product,
+  labelOptions: externalOptions,
 }: {
-  product: Pick<
-    SerializedProductClient,
-    "id" | "name" | "sku" | "barcode" | "sellingPrice"
-  >;
+  product: BarcodeProduct;
+  labelOptions?: Partial<BarcodeLabelOptions>;
 }) {
   const [open, setOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
+  const merged: BarcodeLabelOptions = {
+    ...DEFAULT_LABEL_OPTIONS,
+    ...externalOptions,
+  };
+
+  const [options, setOptions] = useState<BarcodeLabelOptions>(merged);
+
   const { values: form, setField, validate, fieldError: fe } = useValidatedForm(
     {
-      copies: "1",
-      code: product.barcode || product.sku || product.id,
+      copies: String(merged.copies),
+      code: generateBarcodeValue(product),
     },
     barcodePrintSchema
   );
-
-  useEffect(() => {
-    if (!open || !printRef.current) return;
-    const containers = printRef.current.querySelectorAll(".barcode-canvas");
-    containers.forEach((container) => {
-      const svg = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "svg"
-      );
-      try {
-        JsBarcode(svg, form.code, {
-          format: "CODE128",
-          width: 1.5,
-          height: 50,
-          displayValue: true,
-          fontSize: 12,
-          margin: 5,
-        });
-        container.innerHTML = "";
-        container.appendChild(svg);
-      } catch {
-        container.textContent = "Invalid barcode";
-      }
-    });
-  }, [open, form.code, form.copies]);
 
   function handlePrint() {
     if (!validate()) return;
@@ -66,29 +59,25 @@ export function BarcodePrintDialog({
     if (!content) return;
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`
-      <html><head><title>Barcode - ${product.name}</title>
-      <style>
-        body { font-family: sans-serif; margin: 0; padding: 8px; }
-        .label { display: inline-block; text-align: center; padding: 8px; margin: 4px; border: 1px dashed #ccc; page-break-inside: avoid; width: 180px; }
-        .name { font-size: 11px; font-weight: bold; margin-bottom: 4px; word-wrap: break-word; }
-        .price { font-size: 10px; margin-top: 4px; }
-      </style></head><body>${content}</body></html>
-    `);
+    win.document.write(
+      buildBarcodePrintHtml(content, `Barcode - ${product.name}`)
+    );
     win.document.close();
     win.print();
   }
 
   const numCopies = Math.min(parseInt(form.copies) || 1, 50);
+  const printOptions = {
+    ...options,
+    copies: numCopies,
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 w-8"
-      >
+      <DialogTrigger className="inline-flex items-center justify-center rounded-lg hover:bg-muted h-8 w-8">
         <Barcode className="h-4 w-4" />
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Print Barcode Label</DialogTitle>
         </DialogHeader>
@@ -122,18 +111,76 @@ export function BarcodePrintDialog({
               onChange={(e) => setField("copies", e.target.value)}
             />
           </FormField>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormSelect2
+              label="Format"
+              value={options.format}
+              onChange={(v) =>
+                setOptions((o) => ({ ...o, format: v as BarcodeFormat }))
+              }
+              options={[
+                { value: "CODE128", label: "CODE128" },
+                { value: "EAN13", label: "EAN-13" },
+                { value: "UPC", label: "UPC" },
+                { value: "CODE39", label: "CODE39" },
+              ]}
+            />
+            <FormSelect2
+              label="Label size"
+              value={options.labelSize}
+              onChange={(v) =>
+                setOptions((o) => ({ ...o, labelSize: v as LabelSize }))
+              }
+              options={[
+                { value: "small", label: "Small" },
+                { value: "medium", label: "Medium" },
+                { value: "large", label: "Large" },
+              ]}
+            />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="dlg-show-name"
+                checked={options.showName}
+                onCheckedChange={(c) =>
+                  setOptions((o) => ({ ...o, showName: c === true }))
+                }
+              />
+              <Label htmlFor="dlg-show-name">Name</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="dlg-show-sku"
+                checked={options.showSku}
+                onCheckedChange={(c) =>
+                  setOptions((o) => ({ ...o, showSku: c === true }))
+                }
+              />
+              <Label htmlFor="dlg-show-sku">SKU</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="dlg-show-price"
+                checked={options.showPrice}
+                onCheckedChange={(c) =>
+                  setOptions((o) => ({ ...o, showPrice: c === true }))
+                }
+              />
+              <Label htmlFor="dlg-show-price">Price</Label>
+            </div>
+          </div>
           <div
             ref={printRef}
             className="flex flex-wrap gap-2 border rounded-lg p-4 bg-white"
           >
             {Array.from({ length: numCopies }).map((_, i) => (
-              <div key={i} className="label inline-block text-center p-2 border border-dashed w-[180px]">
-                <div className="name text-xs font-bold mb-1">{product.name}</div>
-                <div className="barcode-canvas" />
-                <div className="price text-[10px] mt-1">
-                  ৳{Number(product.sellingPrice).toFixed(2)}
-                </div>
-              </div>
+              <BarcodeLabelBlock
+                key={i}
+                product={product}
+                code={form.code}
+                options={printOptions}
+              />
             ))}
           </div>
           <Button type="button" className="w-full" onClick={handlePrint}>

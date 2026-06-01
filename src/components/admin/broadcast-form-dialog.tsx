@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { broadcastSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-field";
 import {
   Dialog,
@@ -146,9 +147,13 @@ export function BroadcastFormDialog({
               Send to all active tenants now
             </label>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
+          <SubmitButton
+            loading={loading}
+            loadingText={form.sendNow && !isSent ? "Sending..." : "Saving..."}
+            className="w-full"
+          >
             {form.sendNow && !isSent ? "Send" : "Save"}
-          </Button>
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

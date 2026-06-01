@@ -49,10 +49,19 @@ export function PurchaseReturnDialog({
   async function handleFullReturn() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/purchases/${purchaseId}/return`, {
+      const res = await fetch("/api/purchase-returns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          purchaseId,
+          items: returnableItems
+            .filter((i) => i.maxReturn > 0)
+            .map((i) => ({
+              purchaseItemId: i.id,
+              quantity: i.maxReturn,
+            })),
+          status: "COMPLETED",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Return failed");
@@ -82,10 +91,14 @@ export function PurchaseReturnDialog({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/purchases/${purchaseId}/return`, {
+      const res = await fetch("/api/purchase-returns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: returnItems }),
+        body: JSON.stringify({
+          purchaseId,
+          items: returnItems,
+          status: "COMPLETED",
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Return failed");

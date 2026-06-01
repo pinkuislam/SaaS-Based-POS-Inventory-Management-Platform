@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   if ("error" in authResult) return authResult.error;
 
   const tenantId = authResult.session.user.tenantId!;
-  const { subject, message, priority } = await request.json();
+  const { subject, message, priority, category } = await request.json();
 
   if (!subject?.trim() || !message?.trim()) {
     return NextResponse.json(
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       subject: subject.trim(),
       message: message.trim(),
       priority: priority || "medium",
+      category: category?.trim() || null,
       status: "open",
     },
   });

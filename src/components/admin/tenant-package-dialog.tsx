@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { tenantPackageSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormSelect2 } from "@/components/ui/form-field";
 import {
   Dialog,
@@ -81,9 +82,9 @@ export function TenantPackageDialog({
             onChange={(v) => setField("packageId", v)}
             placeholder="Select package"
           />
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Saving..." : "Update Package"}
-          </Button>
+          <SubmitButton loading={loading} className="w-full">
+            Update Package
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

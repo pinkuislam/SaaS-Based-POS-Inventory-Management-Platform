@@ -1,22 +1,22 @@
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import { AdminRoleFormDialog } from "@/components/admin/admin-role-form-dialog";
-import { DeleteButton } from "@/components/admin/simple-crud-actions";
+import { RolesList } from "@/components/admin/lists/roles-list";
 
 export default async function AdminRolesPage() {
   const roles = await prisma.adminRole.findMany({
     orderBy: { name: "asc" },
     include: { _count: { select: { admins: true } } },
   });
+
+  const rows = roles.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    isActive: r.isActive,
+    adminCount: r._count.admins,
+    permissions: r.permissions,
+  }));
 
   return (
     <div className="space-y-6">
@@ -29,37 +29,7 @@ export default async function AdminRolesPage() {
       </div>
       <Card>
         <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Role</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Admins</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roles.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
-                  <TableCell className="max-w-md truncate text-muted-foreground">
-                    {r.description || "—"}
-                  </TableCell>
-                  <TableCell>{r._count.admins}</TableCell>
-                  <TableCell>
-                    <Badge variant={r.isActive ? "default" : "secondary"}>
-                      {r.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="flex gap-1">
-                    <AdminRoleFormDialog role={r} mode="edit" />
-                    <DeleteButton url={`/api/admin/roles/${r.id}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <RolesList roles={rows} />
         </CardContent>
       </Card>
     </div>

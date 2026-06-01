@@ -28,6 +28,12 @@ interface PosState {
   setPaymentMethod: (method: string) => void;
   setNotes: (notes: string) => void;
   clearCart: () => void;
+  loadHeldSale: (payload: {
+    customerId: string | null;
+    customerName: string;
+    invoiceDiscount: number;
+    items: CartItem[];
+  }) => void;
   getSubtotal: () => number;
   getTax: () => number;
   getTotal: () => number;
@@ -95,6 +101,14 @@ export const usePosStore = create<PosState>((set, get) => ({
       customerName: "Walk-in Customer",
       invoiceDiscount: 0,
       notes: "",
+    }),
+
+  loadHeldSale: (payload) =>
+    set({
+      items: payload.items,
+      customerId: payload.customerId,
+      customerName: payload.customerName,
+      invoiceDiscount: payload.invoiceDiscount,
     }),
 
   getSubtotal: () => {

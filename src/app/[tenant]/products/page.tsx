@@ -1,26 +1,30 @@
-import { getTenantId } from "@/lib/tenant";
+import { Suspense } from "react";
+import { getTenantId, getTenantSlug } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { activeProductWhere } from "@/lib/products";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency, decimalToNumber } from "@/lib/utils";
-import { ProductFormDialog } from "@/components/products/product-form-dialog";
+import { ProductsToolbar } from "@/components/products/products-toolbar";
+import { ProductsTable } from "@/components/products/products-table";
+import { ShowArchivedProducts } from "@/components/products/show-archived-products";
+import { serializeProductForClient } from "@/lib/serialize";
+import { decimalToNumber } from "@/lib/utils";
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
   const tenantId = await getTenantId();
+  const tenantSlug = await getTenantSlug();
+  const { show } = await searchParams;
+  const showAll = show === "all";
 
   const [products, categories, brands, units] = await Promise.all([
     prisma.product.findMany({
-      where: { tenantId },
-      include: { category: true, brand: true, unit: true },
+      where: showAll
+        ? { tenantId }
+        : activeProductWhere(tenantId, { includeInactive: true }),
+      include: { category: true, branch: { select: { name: true } } },
       orderBy: { name: "asc" },
     }),
     prisma.productCategory.findMany({ where: { tenantId } }),
@@ -37,63 +41,32 @@ export default async function ProductsPage() {
             Manage your product catalog ({products.length} items)
           </p>
         </div>
-        <ProductFormDialog
+        <ProductsToolbar
           categories={categories}
           brands={brands}
           units={units}
         />
       </div>
 
+      <Suspense>
+        <ShowArchivedProducts tenantSlug={tenantSlug} />
+      </Suspense>
+
       <Card>
         <CardHeader>
           <CardTitle>Product List</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Cost</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {product.sku || "—"}
-                  </TableCell>
-                  <TableCell>{product.category?.name || "—"}</TableCell>
-                  <TableCell>
-                    {formatCurrency(decimalToNumber(product.purchasePrice))}
-                  </TableCell>
-                  <TableCell>
-                    {formatCurrency(decimalToNumber(product.sellingPrice))}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        decimalToNumber(product.stockQty) <=
-                        decimalToNumber(product.reorderLevel)
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {decimalToNumber(product.stockQty)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{product.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ProductsTable
+            products={products.map((p) => ({
+              ...serializeProductForClient(p),
+              stockQty: decimalToNumber(p.stockQty),
+              status: p.status,
+              categoryName: p.category?.name ?? null,
+              branchName: p.branch?.name ?? null,
+              deletedAt: p.deletedAt?.toISOString() ?? null,
+            }))}
+          />
         </CardContent>
       </Card>
     </div>

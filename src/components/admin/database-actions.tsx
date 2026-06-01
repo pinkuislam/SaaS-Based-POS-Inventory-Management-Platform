@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { confirmAction } from "@/lib/confirm";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/admin/loading-button";
 
 export function DatabaseActions({
   tenantId,
@@ -53,14 +53,22 @@ export function DatabaseActions({
   return (
     <div className="flex gap-2">
       {!provisioned && (
-        <Button size="sm" variant="outline" onClick={() => runAction("provision")}>
+        <ActionButton
+          size="sm"
+          variant="outline"
+          loading={loading === "provision"}
+          loadingText="Provisioning..."
+          onClick={() => runAction("provision")}
+        >
           Provision
-        </Button>
+        </ActionButton>
       )}
-      <Button
+      <ActionButton
         size="sm"
         variant="outline"
-        disabled={!provisioned || loading !== null}
+        disabled={!provisioned || (loading !== null && loading !== "backup")}
+        loading={loading === "backup"}
+        loadingText="Backing up…"
         title={
           provisioned
             ? "Create SQL backup of dedicated tenant database"
@@ -68,8 +76,8 @@ export function DatabaseActions({
         }
         onClick={() => runAction("backup")}
       >
-        {loading === "backup" ? "Backing up…" : "Record Backup"}
-      </Button>
+        Record Backup
+      </ActionButton>
     </div>
   );
 }

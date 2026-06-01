@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InvoicePrint } from "@/components/sales/invoice-print";
 import { SaleReturnDialog } from "@/components/sales/sale-return-dialog";
+import { SaleVoidDialog } from "@/components/sales/sale-void-dialog";
 import { ArrowLeft } from "lucide-react";
 
 export default async function SaleDetailPage({
@@ -47,12 +48,21 @@ export default async function SaleDetailPage({
             </div>
           </div>
         </div>
-        <SaleReturnDialog
-          saleId={sale.id}
-          invoiceNo={sale.invoiceNo}
-          items={sale.items}
-          status={sale.status}
-        />
+        <div className="flex gap-2">
+          {sale.status === "COMPLETED" && (
+            <SaleReturnDialog
+              saleId={sale.id}
+              invoiceNo={sale.invoiceNo}
+              items={sale.items}
+              status={sale.status}
+            />
+          )}
+          <SaleVoidDialog
+            saleId={sale.id}
+            invoiceNo={sale.invoiceNo}
+            status={sale.status}
+          />
+        </div>
       </div>
 
       <InvoicePrint sale={sale} />

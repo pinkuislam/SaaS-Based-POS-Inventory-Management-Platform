@@ -1,21 +1,12 @@
-import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { FeatureFormDialog } from "@/components/admin/feature-form-dialog";
-import { DeleteButton } from "@/components/admin/simple-crud-actions";
+import { FeaturesTable } from "@/components/admin/features-table";
+import { getPlatformFeaturesForAdmin } from "@/lib/admin/platform-features";
+
+export const revalidate = 120;
 
 export default async function FeaturesPage() {
-  const features = await prisma.platformFeature.findMany({
-    orderBy: [{ module: "asc" }, { sortOrder: "asc" }],
-  });
+  const features = await getPlatformFeaturesForAdmin();
 
   return (
     <div className="space-y-6">
@@ -33,35 +24,7 @@ export default async function FeaturesPage() {
           <CardTitle>All Features ({features.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>Module</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {features.map((f) => (
-                <TableRow key={f.id}>
-                  <TableCell className="font-medium">{f.name}</TableCell>
-                  <TableCell className="font-mono text-xs">{f.key}</TableCell>
-                  <TableCell>{f.module}</TableCell>
-                  <TableCell>
-                    <Badge variant={f.isActive ? "default" : "secondary"}>
-                      {f.isActive ? "Active" : "Disabled"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="flex gap-1">
-                    <FeatureFormDialog feature={f} mode="edit" />
-                    <DeleteButton url={`/api/admin/features/${f.id}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <FeaturesTable features={features} />
         </CardContent>
       </Card>
     </div>

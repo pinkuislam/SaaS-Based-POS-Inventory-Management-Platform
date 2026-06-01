@@ -5,6 +5,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { totpCodeSchema } from "@/lib/schemas/forms";
 import { Button } from "@/components/ui/button";
+import { ActionButton, SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput } from "@/components/ui/form-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -91,9 +92,9 @@ export function Security2faPanel() {
           Status: <strong>{enabled ? "Enabled" : "Disabled"}</strong>
         </p>
         {!enabled && !qrCode && (
-          <Button onClick={setup} disabled={loading}>
+          <ActionButton onClick={setup} loading={loading} loadingText="Setting up...">
             Set up 2FA
-          </Button>
+          </ActionButton>
         )}
         {qrCode && (
           <div className="space-y-3">
@@ -132,9 +133,12 @@ export function Security2faPanel() {
                 onChange={(e) => setField("code", e.target.value)}
               />
             </FormField>
-            <Button type="submit" disabled={loading}>
+            <SubmitButton
+              loading={loading}
+              loadingText={enabled ? "Disabling..." : "Enabling..."}
+            >
               {enabled ? "Disable 2FA" : "Enable 2FA"}
-            </Button>
+            </SubmitButton>
           </form>
         )}
       </CardContent>

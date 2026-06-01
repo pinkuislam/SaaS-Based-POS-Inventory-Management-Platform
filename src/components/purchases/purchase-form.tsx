@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
+import { tenantDashboardPath } from "@/lib/tenant-path";
 import { notify } from "@/lib/notify";
 import { purchaseFormSchema } from "@/lib/schemas/forms";
 import { useValidatedForm } from "@/hooks/use-validated-form";
@@ -25,8 +26,10 @@ interface ProductResult {
   stockQty: unknown;
 }
 
-export function PurchaseForm() {
+export function PurchaseForm({ purchaseId }: { purchaseId?: string }) {
   const router = useRouter();
+  const params = useParams();
+  const tenantSlug = (params?.tenant as string) || "";
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<ProductResult[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>(
@@ -37,9 +40,12 @@ export function PurchaseForm() {
   const {
     items,
     supplierId,
+    supplierInvoiceNo,
     discount,
     tax,
+    shippingCost,
     paidAmount,
+    paymentMethod,
     notes,
     addItem,
     updateQuantity,
@@ -48,6 +54,9 @@ export function PurchaseForm() {
     setSupplier,
     setDiscount,
     setTax,
+    setShippingCost,
+    setSupplierInvoiceNo,
+    setPaymentMethod,
     setPaidAmount,
     setNotes,
     clear,
@@ -109,8 +118,7 @@ export function PurchaseForm() {
     ...suppliers.map((s) => ({ value: s.id, label: s.name })),
   ];
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function savePurchase(status: "DRAFT" | "COMPLETED") {
     if (items.length === 0) {
       notify.error("Add at least one product");
       return;
@@ -135,34 +143,65 @@ export function PurchaseForm() {
       };
     });
 
+    const payload = {
+      items: purchaseItems,
+      supplierId: data.supplierId || null,
+      supplierInvoiceNo: supplierInvoiceNo || null,
+      subtotal,
+      discount,
+      tax,
+      shippingCost,
+      total,
+      paidAmount: data.paidAmount
+        ? parseFloat(data.paidAmount)
+        : paidAmount || 0,
+      paymentMethod,
+      notes: data.notes,
+      status,
+    };
+
     try {
-      const res = await fetch("/api/purchases", {
-        method: "POST",
+      const url = purchaseId
+        ? `/api/purchases/${purchaseId}`
+        : "/api/purchases";
+      const method = purchaseId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: purchaseItems,
-          supplierId: data.supplierId || null,
-          subtotal,
-          discount,
-          tax,
-          total,
-          paidAmount: data.paidAmount
-            ? parseFloat(data.paidAmount)
-            : paidAmount || total,
-          notes: data.notes,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error();
-      const purchase = await res.json();
-      notify.success(`Purchase saved: ${purchase.invoiceNo}`);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+
+      if (purchaseId && status === "COMPLETED") {
+        const completeRes = await fetch(
+          `/api/purchases/${purchaseId}/complete`,
+          { method: "POST" }
+        );
+        if (!completeRes.ok) {
+          const err = await completeRes.json();
+          throw new Error(err.error);
+        }
+      }
+
+      notify.success(
+        status === "DRAFT"
+          ? `Draft saved: ${result.invoiceNo}`
+          : `Purchase saved: ${result.invoiceNo}`
+      );
       clear();
-      router.push("/dashboard/purchases");
+      router.push(tenantDashboardPath(tenantSlug, "/purchases"));
       router.refresh();
-    } catch {
-      notify.error("Failed to save purchase");
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Failed to save purchase");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    savePurchase("COMPLETED");
   }
 
   const total = getTotal();
@@ -319,6 +358,27 @@ export function PurchaseForm() {
                 onChange={(e) => setTax(parseFloat(e.target.value) || 0)}
               />
             </FormField>
+            <FormField label="Shipping">
+              <FormInput
+                type="number"
+                value={shippingCost || ""}
+                onChange={(e) =>
+                  setShippingCost(parseFloat(e.target.value) || 0)
+                }
+              />
+            </FormField>
+            <FormField label="Payment method">
+              <FormSelect2
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                options={[
+                  { value: "cash", label: "Cash" },
+                  { value: "bank", label: "Bank" },
+                  { value: "card", label: "Card" },
+                  { value: "cheque", label: "Cheque" },
+                ]}
+              />
+            </FormField>
           </div>
 
           <FormField
@@ -375,13 +435,24 @@ export function PurchaseForm() {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || items.length === 0}
-          >
-            {loading ? "Saving..." : "Save Purchase"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={loading || items.length === 0}
+              onClick={() => savePurchase("DRAFT")}
+            >
+              Save draft
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={loading || items.length === 0}
+            >
+              {loading ? "Saving..." : "Complete purchase"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </form>

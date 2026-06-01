@@ -3,17 +3,9 @@ import { tenantDashboardPath } from "@/lib/tenant-path";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency, formatDate, decimalToNumber } from "@/lib/utils";
+import { PurchasesTable } from "@/components/purchases/purchases-table";
+import { decimalToNumber } from "@/lib/utils";
 import { Plus } from "lucide-react";
 
 export default async function PurchasesPage() {
@@ -23,8 +15,29 @@ export default async function PurchasesPage() {
   const purchases = await prisma.purchase.findMany({
     where: { tenantId },
     orderBy: { purchaseDate: "desc" },
-    include: { supplier: true, user: true },
+    include: {
+      supplier: true,
+      items: { include: { product: true } },
+    },
   });
+
+  const rows = purchases.map((p) => ({
+    id: p.id,
+    invoiceNo: p.invoiceNo,
+    supplierName: p.supplier?.name || "—",
+    total: decimalToNumber(p.total),
+    paidAmount: decimalToNumber(p.paidAmount),
+    dueAmount: decimalToNumber(p.dueAmount),
+    paymentStatus: p.paymentStatus,
+    status: p.status,
+    purchaseDate: p.purchaseDate.toISOString(),
+    items: p.items.map((item) => ({
+      id: item.id,
+      quantity: decimalToNumber(item.quantity),
+      returnedQty: decimalToNumber(item.returnedQty),
+      product: { name: item.product.name },
+    })),
+  }));
 
   return (
     <div className="space-y-6">
@@ -33,12 +46,17 @@ export default async function PurchasesPage() {
           <h1 className="text-2xl font-bold">Purchases</h1>
           <p className="text-muted-foreground">Supplier purchase records</p>
         </div>
-        <Link href={tenantDashboardPath(tenant, "/purchases/new")}>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Purchase
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href={tenantDashboardPath(tenant, "/purchase-returns")}>
+            <Button variant="outline">Purchase returns</Button>
+          </Link>
+          <Link href={tenantDashboardPath(tenant, "/purchases/new")}>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Purchase
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>
@@ -56,40 +74,7 @@ export default async function PurchasesPage() {
               </Link>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Paid</TableHead>
-                  <TableHead>Due</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchases.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-mono">{p.invoiceNo}</TableCell>
-                    <TableCell>{p.supplier?.name || "—"}</TableCell>
-                    <TableCell>
-                      {formatCurrency(decimalToNumber(p.total))}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(decimalToNumber(p.paidAmount))}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(decimalToNumber(p.dueAmount))}
-                    </TableCell>
-                    <TableCell>
-                      <Badge>{p.paymentStatus}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(p.purchaseDate)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <PurchasesTable purchases={rows} tenantSlug={tenant} />
           )}
         </CardContent>
       </Card>

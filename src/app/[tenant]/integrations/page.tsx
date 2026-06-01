@@ -1,6 +1,9 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { WooCommerceConnect } from "@/components/integrations/woocommerce-connect";
+import { ShopifyConnect } from "@/components/integrations/shopify-connect";
+import { IntegrationSyncLogs } from "@/components/integrations/integration-sync-logs";
+import { SyncedProductsPanel } from "@/components/integrations/synced-products-panel";
 import { tenantHomePath } from "@/lib/tenant-path";
 
 export default async function TenantIntegrationsPage({
@@ -28,6 +31,9 @@ export default async function TenantIntegrationsPage({
         </p>
       </div>
       <WooCommerceConnect />
+      <ShopifyConnect />
+      <SyncedProductsPanel />
+      <IntegrationSyncLogs />
     </div>
   );
 }

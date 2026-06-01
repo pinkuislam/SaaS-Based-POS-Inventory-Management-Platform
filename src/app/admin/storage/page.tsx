@@ -1,15 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { StatCard } from "@/components/ui/stat-card";
 import { Package, Receipt } from "lucide-react";
+import { StorageList } from "@/components/admin/lists/storage-list";
 
 export default async function StoragePage() {
   const tenants = await prisma.tenant.findMany({
@@ -24,8 +17,20 @@ export default async function StoragePage() {
     orderBy: { name: "asc" },
   });
 
-  const totalProducts = await prisma.product.count();
-  const totalSales = await prisma.sale.count();
+  const [totalProducts, totalSales] = await Promise.all([
+    prisma.product.count(),
+    prisma.sale.count(),
+  ]);
+
+  const rows = tenants.map((t) => ({
+    id: t.id,
+    name: t.name,
+    slug: t.slug,
+    productCount: t._count.products,
+    salesCount: t._count.sales,
+    estMb: Math.round(t._count.products * 0.05 + t._count.sales * 0.01),
+    storageLimitMb: t.package?.storageLimitMb ?? 1024,
+  }));
 
   return (
     <div className="space-y-6">
@@ -42,34 +47,7 @@ export default async function StoragePage() {
           <CardTitle>Tenant Usage (estimated)</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Sales</TableHead>
-                <TableHead>Est. MB</TableHead>
-                <TableHead>Limit MB</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tenants.map((t) => {
-                const est = Math.round(
-                  t._count.products * 0.05 + t._count.sales * 0.01
-                );
-                const limit = t.package?.storageLimitMb ?? 1024;
-                return (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell>{t._count.products}</TableCell>
-                    <TableCell>{t._count.sales}</TableCell>
-                    <TableCell>{est}</TableCell>
-                    <TableCell>{limit}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <StorageList tenants={rows} />
         </CardContent>
       </Card>
     </div>

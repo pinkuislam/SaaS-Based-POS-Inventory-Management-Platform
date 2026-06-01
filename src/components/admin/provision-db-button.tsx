@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { confirmAction } from "@/lib/confirm";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/admin/loading-button";
 import { Database } from "lucide-react";
 
 export function ProvisionDbButton({
@@ -62,15 +62,16 @@ export function ProvisionDbButton({
   }
 
   return (
-    <Button
+    <ActionButton
       variant="outline"
       size="sm"
       className="h-7 text-xs"
       onClick={handleProvision}
-      disabled={loading}
+      loading={loading}
+      loadingText="Provisioning..."
     >
       <Database className="h-3 w-3 mr-1" />
-      {loading ? "..." : "Provision DB"}
-    </Button>
+      Provision DB
+    </ActionButton>
   );
 }

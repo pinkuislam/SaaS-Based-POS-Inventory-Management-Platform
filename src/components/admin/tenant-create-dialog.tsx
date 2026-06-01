@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { tenantCreateSchema } from "@/lib/schemas/admin-tenant";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/admin/loading-button";
 import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import {
   Dialog,
@@ -209,9 +210,9 @@ export function TenantCreateDialog({
               onChange={(e) => setField("adminPassword", e.target.value)}
             />
           </FormField>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating..." : "Create Tenant"}
-          </Button>
+          <SubmitButton loading={loading} loadingText="Creating..." className="w-full">
+            Create Tenant
+          </SubmitButton>
         </form>
       </DialogContent>
     </Dialog>

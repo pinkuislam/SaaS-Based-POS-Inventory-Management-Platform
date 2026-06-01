@@ -7,6 +7,8 @@ import { userSchema } from "@/lib/schemas/forms";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +17,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
+import { PermissionPicker } from "@/components/permissions/permission-picker";
+import { z } from "zod";
+
+const createUserSchema = userSchema.extend({
+  isActive: z.boolean().optional(),
+});
 
 interface Option {
   id: string;
@@ -31,6 +39,8 @@ export function UserFormDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [extraPermissions, setExtraPermissions] = useState<string[]>([]);
+  const [showPermissions, setShowPermissions] = useState(false);
 
   const { values, setField, validate, fieldError, reset } = useValidatedForm(
     {
@@ -40,11 +50,14 @@ export function UserFormDialog({
       phone: "",
       roleId: "",
       branchId: "",
+      isActive: true,
     },
-    userSchema
+    createUserSchema
   );
 
-  const roleOptions = roles.map((r) => ({ value: r.id, label: r.name }));
+  const roleOptions = roles
+    .filter((r) => r.name)
+    .map((r) => ({ value: r.id, label: r.name }));
   const branchOptions = [
     { value: "", label: "No branch" },
     ...branches.map((b) => ({ value: b.id, label: b.name })),
@@ -64,6 +77,7 @@ export function UserFormDialog({
           ...data,
           roleId: data.roleId || null,
           branchId: data.branchId || null,
+          extraPermissions,
         }),
       });
       const resData = await res.json();
@@ -71,6 +85,8 @@ export function UserFormDialog({
       notify.success("User created");
       setOpen(false);
       reset();
+      setExtraPermissions([]);
+      setShowPermissions(false);
       router.refresh();
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Failed to create user");
@@ -85,7 +101,7 @@ export function UserFormDialog({
         <Plus className="h-4 w-4" />
         Add User
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Invite Team Member</DialogTitle>
         </DialogHeader>
@@ -98,7 +114,6 @@ export function UserFormDialog({
           >
             <FormInput
               id="name"
-              name="name"
               value={values.name}
               error={fieldError("name")}
               onChange={(e) => setField("name", e.target.value)}
@@ -112,11 +127,17 @@ export function UserFormDialog({
           >
             <FormInput
               id="email"
-              name="email"
               type="email"
               value={values.email}
               error={fieldError("email")}
               onChange={(e) => setField("email", e.target.value)}
+            />
+          </FormField>
+          <FormField label="Phone" htmlFor="phone">
+            <FormInput
+              id="phone"
+              value={values.phone}
+              onChange={(e) => setField("phone", e.target.value)}
             />
           </FormField>
           <FormField
@@ -127,7 +148,6 @@ export function UserFormDialog({
           >
             <FormInput
               id="password"
-              name="password"
               type="password"
               value={values.password}
               error={fieldError("password")}
@@ -137,7 +157,6 @@ export function UserFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <FormSelect2
               label="Role"
-              htmlFor="roleId"
               required
               options={roleOptions}
               value={values.roleId}
@@ -147,13 +166,39 @@ export function UserFormDialog({
             />
             <FormSelect2
               label="Branch"
-              htmlFor="branchId"
               options={branchOptions}
               value={values.branchId}
               onChange={(v) => setField("branchId", v)}
               placeholder="Select branch"
-              error={fieldError("branchId")}
             />
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={values.isActive}
+              onCheckedChange={(c) => setField("isActive", c === true)}
+            />
+            <Label className="font-normal">Active user</Label>
+          </label>
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPermissions((s) => !s)}
+            >
+              {showPermissions ? "Hide" : "Set"} extra permissions
+            </Button>
+            {showPermissions ? (
+              <div className="mt-3">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Additional permissions on top of the assigned role
+                </p>
+                <PermissionPicker
+                  selected={extraPermissions}
+                  onChange={setExtraPermissions}
+                />
+              </div>
+            ) : null}
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating..." : "Create User"}

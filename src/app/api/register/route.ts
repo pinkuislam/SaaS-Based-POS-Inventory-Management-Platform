@@ -45,12 +45,26 @@ export async function POST(request: Request) {
     const tenant = await prisma.tenant.create({
       data: {
         name: businessName,
+        ownerName: ownerName?.trim() || null,
         slug: finalSlug,
         email,
         phone,
         status: "PENDING",
         packageId: pkg?.id,
         dbName: `tenant_${finalSlug.replace(/-/g, "_")}`,
+        settings: {
+          business: {
+            currency: "BDT",
+            timezone: "Asia/Dhaka",
+            invoicePrefix: "INV",
+            businessType: "retail",
+          },
+          invoice: { prefix: "INV" },
+          pos: {
+            defaultTaxRate: 0,
+            receiptFooter: "Thank you for your business!",
+          },
+        },
       },
     });
 

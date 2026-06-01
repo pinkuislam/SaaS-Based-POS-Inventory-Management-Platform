@@ -277,7 +277,10 @@ export type SerializedCoupon = {
   discountValue: number;
   expiryDate: string | null;
   usageLimit: number | null;
+  usedCount: number;
   packageId: string | null;
+  packageName: string | null;
+  isActive: boolean;
 };
 
 export function serializeCoupon(coupon: {
@@ -287,7 +290,10 @@ export function serializeCoupon(coupon: {
   discountValue: unknown;
   expiryDate: Date | string | null;
   usageLimit: number | null;
+  usedCount: number;
   packageId: string | null;
+  isActive: boolean;
+  package?: { name: string } | null;
 }): SerializedCoupon {
   return {
     id: coupon.id,
@@ -296,7 +302,10 @@ export function serializeCoupon(coupon: {
     discountValue: decimalToNumber(coupon.discountValue),
     expiryDate: toIsoDateString(coupon.expiryDate),
     usageLimit: coupon.usageLimit,
+    usedCount: coupon.usedCount,
     packageId: coupon.packageId,
+    packageName: coupon.package?.name ?? null,
+    isActive: coupon.isActive,
   };
 }
 

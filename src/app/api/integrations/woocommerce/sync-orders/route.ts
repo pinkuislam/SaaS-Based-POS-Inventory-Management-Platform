@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchWooOrders } from "@/lib/woocommerce";
 import { generateInvoiceNo } from "@/lib/utils";
 import { logActivity } from "@/lib/activity-log";
+import { ecommerceSettingKey } from "@/lib/ecommerce-platform";
 
 export async function POST() {
   const authResult = await requirePermission("manage_settings");
@@ -23,10 +24,14 @@ export async function POST() {
   }
 
   const setting = await prisma.ecommerceSetting.findUnique({
-    where: { tenantId },
+    where: ecommerceSettingKey(tenantId, "woocommerce"),
   });
 
-  if (!setting?.isActive || !setting.syncOrders) {
+  if (
+    !setting?.isActive ||
+    setting.platform !== "woocommerce" ||
+    !setting.syncOrders
+  ) {
     return NextResponse.json(
       { error: "Order sync not enabled" },
       { status: 400 }
@@ -39,6 +44,7 @@ export async function POST() {
     consumerSecret: setting.consumerSecret,
   };
 
+  try {
   const orders = await fetchWooOrders(
     config,
     setting.lastOrderSync || undefined
@@ -166,7 +172,7 @@ export async function POST() {
   }
 
   await prisma.ecommerceSetting.update({
-    where: { tenantId },
+    where: ecommerceSettingKey(tenantId, "woocommerce"),
     data: { lastOrderSync: new Date() },
   });
 
@@ -180,4 +186,16 @@ export async function POST() {
   });
 
   return NextResponse.json({ imported, skipped });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Sync failed";
+    await logActivity({
+      tenantId,
+      userId: session.user.id,
+      userName: session.user.name,
+      action: "woocommerce_sync_orders_failed",
+      module: "integrations",
+      details: message,
+    });
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

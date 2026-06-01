@@ -18,7 +18,7 @@ export default async function IntegrationsPage() {
     prisma.tenant.findMany({
       where: {
         deletedAt: null,
-        ecommerceSetting: null,
+        ecommerceSettings: { none: {} },
       },
       select: { id: true, name: true, slug: true },
       orderBy: { name: "asc" },
@@ -31,13 +31,14 @@ export default async function IntegrationsPage() {
     tenantId: s.tenantId,
     tenantName: s.tenant.name,
     tenantSlug: s.tenant.slug,
+    platform: s.platform,
     storeUrl: s.storeUrl,
     isActive: s.isActive,
     syncProducts: s.syncProducts,
     syncStock: s.syncStock,
     syncOrders: s.syncOrders,
-    lastProductSync: s.lastProductSync,
-    lastOrderSync: s.lastOrderSync,
+    lastProductSync: s.lastProductSync?.toISOString() ?? null,
+    lastOrderSync: s.lastOrderSync?.toISOString() ?? null,
   }));
 
   return (

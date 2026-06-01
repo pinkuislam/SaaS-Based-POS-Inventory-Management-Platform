@@ -5,7 +5,7 @@ import { notify } from "@/lib/notify";
 import { woocommerceSchema } from "@/lib/schemas/forms";
 import { useValidatedForm } from "@/hooks/use-validated-form";
 import { Button } from "@/components/ui/button";
-import { FormField, FormInput } from "@/components/ui/form-field";
+import { FormField, FormInput, FormSelect2 } from "@/components/ui/form-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,8 +24,12 @@ interface SavedConfig {
   syncProducts: boolean;
   syncStock: boolean;
   syncOrders: boolean;
+  syncCustomers: boolean;
+  syncDirection: string;
+  hasWebhookSecret?: boolean;
   lastProductSync: string | null;
   lastOrderSync: string | null;
+  lastCustomerSync: string | null;
   hasCredentials: boolean;
 }
 
@@ -54,12 +58,15 @@ export function WooCommerceConnect() {
         syncProducts: true,
         syncStock: true,
         syncOrders: true,
+        syncCustomers: false,
+        syncDirection: "inbound",
+        webhookSecret: "",
       },
       woocommerceSchema
     );
 
   async function loadConfig() {
-    const res = await fetch("/api/integrations");
+    const res = await fetch("/api/integrations?platform=woocommerce");
     const data = await res.json();
     if (data && data.storeUrl) {
       setSaved(data);
@@ -70,12 +77,15 @@ export function WooCommerceConnect() {
         syncProducts: data.syncProducts,
         syncStock: data.syncStock,
         syncOrders: data.syncOrders,
+        syncCustomers: data.syncCustomers ?? false,
+        syncDirection: data.syncDirection || "inbound",
+        webhookSecret: "",
       }));
     }
   }
 
   async function loadOrders() {
-    const res = await fetch("/api/integrations/orders");
+    const res = await fetch("/api/integrations/orders?platform=woocommerce");
     if (res.ok) setOrders(await res.json());
   }
 
@@ -103,7 +113,7 @@ export function WooCommerceConnect() {
       const res = await fetch("/api/integrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, platform: "woocommerce" }),
       });
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error);
@@ -143,6 +153,57 @@ export function WooCommerceConnect() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       notify.success(`Products: ${data.created} created, ${data.updated} updated`);
+      await loadConfig();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!saved?.hasCredentials) return;
+    if (!confirm("Disconnect WooCommerce? API keys will be removed.")) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/integrations?platform=woocommerce", {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      notify.success("WooCommerce disconnected");
+      setSaved(null);
+      setValues({
+        storeUrl: "",
+        consumerKey: "",
+        consumerSecret: "",
+        isActive: true,
+        syncProducts: true,
+        syncStock: true,
+        syncOrders: true,
+        syncCustomers: false,
+        syncDirection: "inbound",
+        webhookSecret: "",
+      });
+      setOrders([]);
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Disconnect failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function syncCustomers() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/integrations/woocommerce/sync-customers", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      notify.success(
+        `Customers: ${data.created} created, ${data.updated} updated`
+      );
       await loadConfig();
     } catch (e) {
       notify.error(e instanceof Error ? e.message : "Sync failed");
@@ -243,6 +304,27 @@ export function WooCommerceConnect() {
                 }
               />
             </FormField>
+            <FormSelect2
+              label="Sync direction"
+              value={values.syncDirection || "inbound"}
+              onChange={(v) => setField("syncDirection", v)}
+              options={[
+                { value: "inbound", label: "Inbound (store → POS)" },
+                { value: "outbound", label: "Outbound (POS → store)" },
+                { value: "both", label: "Both directions" },
+              ]}
+            />
+            <FormField label="Webhook secret (optional)" htmlFor="webhookSecret">
+              <FormInput
+                id="webhookSecret"
+                type="password"
+                value={values.webhookSecret}
+                onChange={(e) => setField("webhookSecret", e.target.value)}
+                placeholder={
+                  saved?.hasWebhookSecret ? "Leave blank to keep existing" : ""
+                }
+              />
+            </FormField>
             <div className="flex flex-wrap gap-4">
               {(
                 [
@@ -250,6 +332,7 @@ export function WooCommerceConnect() {
                   ["syncProducts", "Sync products"],
                   ["syncStock", "Update stock from WooCommerce"],
                   ["syncOrders", "Import online orders as sales"],
+                  ["syncCustomers", "Sync customers"],
                 ] as const
               ).map(([key, label]) => (
                 <label key={key} className="flex items-center gap-2 text-sm">
@@ -269,6 +352,11 @@ export function WooCommerceConnect() {
             {saved?.lastOrderSync && (
               <p className="text-xs text-muted-foreground">
                 Last order sync: {formatDate(saved.lastOrderSync)}
+              </p>
+            )}
+            {saved?.lastCustomerSync && (
+              <p className="text-xs text-muted-foreground">
+                Last customer sync: {formatDate(saved.lastCustomerSync)}
               </p>
             )}
             <div className="flex flex-wrap gap-2">
@@ -301,6 +389,24 @@ export function WooCommerceConnect() {
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Sync Orders
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={syncCustomers}
+                disabled={loading || !saved?.isActive}
+              >
+                Sync Customers
+              </Button>
+              {saved?.hasCredentials && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDisconnect}
+                  disabled={loading}
+                >
+                  Disconnect
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
@@ -309,7 +415,7 @@ export function WooCommerceConnect() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Online Orders</CardTitle>
+            <CardTitle>WooCommerce Orders</CardTitle>
             <Button variant="ghost" size="icon" onClick={loadOrders}>
               <RefreshCw className="h-4 w-4" />
             </Button>

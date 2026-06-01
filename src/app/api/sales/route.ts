@@ -12,11 +12,22 @@ export async function GET(request: Request) {
   const tenantId = authResult.session.user.tenantId!;
   const { searchParams } = new URL(request.url);
   const todayOnly = searchParams.get("today") === "1";
+  const posList = searchParams.get("pos") === "1";
+  const limitParam = parseInt(searchParams.get("limit") || "0", 10);
+  const status = searchParams.get("status");
+  const paymentStatus = searchParams.get("paymentStatus");
+  const customerId = searchParams.get("customerId");
+  const branchId = searchParams.get("branchId");
+  const userId = searchParams.get("userId");
 
   const sales = await prisma.sale.findMany({
     where: {
       tenantId,
-      status: "COMPLETED",
+      ...(status ? { status: status as never } : posList || todayOnly ? {} : {}),
+      ...(paymentStatus ? { paymentStatus: paymentStatus as never } : {}),
+      ...(customerId ? { customerId } : {}),
+      ...(branchId ? { branchId } : {}),
+      ...(userId ? { userId } : {}),
       ...(todayOnly && {
         saleDate: {
           gte: startOfDay(new Date()),
@@ -25,8 +36,13 @@ export async function GET(request: Request) {
       }),
     },
     orderBy: { saleDate: "desc" },
-    take: todayOnly ? 500 : 100,
-    include: { customer: true, user: true, items: { include: { product: true } } },
+    take: limitParam > 0 ? limitParam : todayOnly ? 500 : 100,
+    include: {
+      customer: true,
+      user: true,
+      branch: true,
+      items: { include: { product: true } },
+    },
   });
 
   return NextResponse.json(sales);

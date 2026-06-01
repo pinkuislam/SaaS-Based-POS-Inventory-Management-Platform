@@ -1,17 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
 import { AdminUserFormDialog } from "@/components/admin/admin-user-form-dialog";
-import { DeleteButton } from "@/components/admin/simple-crud-actions";
+import { UsersList } from "@/components/admin/lists/users-list";
 
 export default async function AdminUsersPage() {
   const [admins, roles] = await Promise.all([
@@ -25,6 +15,18 @@ export default async function AdminUsersPage() {
     }),
   ]);
 
+  const rows = admins.map((a) => ({
+    id: a.id,
+    name: a.name,
+    email: a.email,
+    phone: a.phone,
+    isActive: a.isActive,
+    isPrimary: a.isPrimary,
+    roleId: a.roleId,
+    roleName: a.role?.name ?? null,
+    createdAt: a.createdAt.toISOString(),
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -36,49 +38,10 @@ export default async function AdminUsersPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Admin Users ({admins.length})</CardTitle>
+          <CardTitle>Admin Users</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {admins.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">
-                    {a.name}
-                    {a.isPrimary && (
-                      <Badge className="ml-2" variant="outline">
-                        Primary
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{a.email}</TableCell>
-                  <TableCell>{a.role?.name || "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={a.isActive ? "default" : "secondary"}>
-                      {a.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatDate(a.createdAt)}</TableCell>
-                  <TableCell className="flex gap-1">
-                    <AdminUserFormDialog roles={roles} admin={a} mode="edit" />
-                    {!a.isPrimary && (
-                      <DeleteButton url={`/api/admin/admins/${a.id}`} />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <UsersList admins={rows} roles={roles} />
         </CardContent>
       </Card>
     </div>

@@ -80,6 +80,27 @@ export async function fetchWooProducts(
   return res.json();
 }
 
+export interface WooCustomer {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  billing: { phone: string };
+}
+
+export async function fetchWooCustomers(
+  config: WooCommerceConfig,
+  page = 1
+): Promise<WooCustomer[]> {
+  const url = withAuth(
+    apiUrl(config.storeUrl, `/customers?per_page=100&page=${page}`),
+    config
+  );
+  const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  if (!res.ok) throw new Error(`WooCommerce customers: HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function fetchWooOrders(
   config: WooCommerceConfig,
   after?: Date

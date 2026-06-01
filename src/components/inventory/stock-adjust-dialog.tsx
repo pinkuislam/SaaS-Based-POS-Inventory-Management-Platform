@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
 import { stockAdjustFormSchema } from "@/lib/schemas/forms";
 import { useValidatedForm } from "@/hooks/use-validated-form";
+import { ADJUSTMENT_TYPES } from "@/lib/inventory";
 import { Button } from "@/components/ui/button";
 import {
   FormField,
@@ -21,9 +22,9 @@ import {
 import { SlidersHorizontal } from "lucide-react";
 import type { SerializedProductAdjustOption } from "@/lib/serialize";
 
-const ADJUSTMENT_TYPE_OPTIONS = [
-  { value: "add", label: "Add Stock" },
-  { value: "remove", label: "Remove Stock" },
+const DIRECTION_OPTIONS = [
+  { value: "add", label: "Increase stock" },
+  { value: "remove", label: "Decrease stock" },
 ];
 
 export function StockAdjustDialog({
@@ -39,7 +40,9 @@ export function StockAdjustDialog({
     {
       productId: "",
       quantity: "",
-      type: "add",
+      direction: "add",
+      adjustType: "adjustment",
+      reason: "",
       note: "",
     },
     stockAdjustFormSchema
@@ -56,7 +59,7 @@ export function StockAdjustDialog({
     if (!data) return;
 
     const qty = parseFloat(data.quantity);
-    const signedQty = data.type === "add" ? qty : -qty;
+    const signedQty = data.direction === "add" ? qty : -qty;
 
     setLoading(true);
     try {
@@ -66,17 +69,23 @@ export function StockAdjustDialog({
         body: JSON.stringify({
           productId: data.productId,
           quantity: signedQty,
-          type: data.type === "remove" ? "damage" : "adjustment",
+          type: data.adjustType,
+          reason: data.reason,
           notes: data.note,
         }),
       });
-      if (!res.ok) throw new Error();
-      notify.success("Stock updated");
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      notify.success(
+        result.status === "PENDING"
+          ? "Adjustment submitted for approval"
+          : "Stock updated"
+      );
       setOpen(false);
       reset();
       router.refresh();
-    } catch {
-      notify.error("Failed to adjust stock");
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Failed to adjust stock");
     } finally {
       setLoading(false);
     }
@@ -88,7 +97,7 @@ export function StockAdjustDialog({
         <SlidersHorizontal className="h-4 w-4" />
         Adjust Stock
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Stock Adjustment</DialogTitle>
         </DialogHeader>
@@ -105,13 +114,21 @@ export function StockAdjustDialog({
             error={fieldError("productId")}
           />
           <FormSelect2
-            label="Type"
-            htmlFor="type"
-            required
-            options={ADJUSTMENT_TYPE_OPTIONS}
-            value={values.type}
-            onChange={(v) => setField("type", v)}
-            error={fieldError("type")}
+            label="Adjustment type"
+            htmlFor="adjustType"
+            options={ADJUSTMENT_TYPES.map((t) => ({
+              value: t.value,
+              label: t.label,
+            }))}
+            value={values.adjustType}
+            onChange={(v) => setField("adjustType", v)}
+          />
+          <FormSelect2
+            label="Direction"
+            htmlFor="direction"
+            options={DIRECTION_OPTIONS}
+            value={values.direction}
+            onChange={(v) => setField("direction", v)}
           />
           <FormField
             label="Quantity"
@@ -121,21 +138,25 @@ export function StockAdjustDialog({
           >
             <FormInput
               id="quantity"
-              name="quantity"
               type="number"
               min="0.001"
               step="any"
               value={values.quantity}
-              error={fieldError("quantity")}
               onChange={(e) => setField("quantity", e.target.value)}
             />
           </FormField>
-          <FormField label="Notes" htmlFor="note" error={fieldError("note")}>
+          <FormField label="Reason" htmlFor="reason">
+            <FormInput
+              id="reason"
+              value={values.reason}
+              onChange={(e) => setField("reason", e.target.value)}
+              placeholder="Required for corrections"
+            />
+          </FormField>
+          <FormField label="Notes" htmlFor="note">
             <FormInput
               id="note"
-              name="note"
               value={values.note}
-              error={fieldError("note")}
               onChange={(e) => setField("note", e.target.value)}
             />
           </FormField>
